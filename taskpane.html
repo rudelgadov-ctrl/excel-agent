@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agente Excel</title>
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/assets/icon-32.png" alt="" width="20" height="20" />
+          <span>Agente Excel</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-new" class="ghost" type="button" title="Empezar una conversación nueva">Nueva</button>
+          <button id="btn-settings" class="ghost" type="button" title="API key, modelo y modo">Ajustes</button>
+        </div>
+      </header>
+
+      <div id="host-warning" class="banner warn" hidden>
+        Este panel funciona dentro de Excel. Ábrelo desde Inicio &gt; Agente Excel.
+      </div>
+
+      <section id="settings" class="settings" hidden>
+        <h2>Ajustes</h2>
+        <label class="field">
+          <span>API key de Anthropic</span>
+          <div class="row">
+            <input id="set-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
+            <button id="btn-toggle-key" class="ghost small" type="button">Ver</button>
+          </div>
+          <small>
+            Se guarda solo en esta computadora. Créala en
+            <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>
+            (requiere crédito de API; la suscripción Claude Pro/Max no la incluye).
+          </small>
+        </label>
+        <label class="field">
+          <span>Modelo</span>
+          <select id="set-model"></select>
+        </label>
+        <label class="field">
+          <span>Esfuerzo</span>
+          <select id="set-effort"></select>
+        </label>
+        <label class="check">
+          <input id="set-auto" type="checkbox" />
+          <span>Modo automático: ejecutar sin pedir aprobación del plan</span>
+        </label>
+        <div class="row end">
+          <span id="settings-msg" class="muted"></span>
+          <button id="btn-save-settings" class="primary" type="button">Guardar</button>
+        </div>
+      </section>
+
+      <main id="log" aria-live="polite">
+        <div id="empty" class="empty">
+          <h2>¿Qué hay que hacer en este libro?</h2>
+          <ol>
+            <li>Abre la plantilla en Excel.</li>
+            <li>Pega las instrucciones o adjunta el PDF.</li>
+            <li>Revisa el plan y presiona <strong>Aprobar y ejecutar</strong>.</li>
+          </ol>
+          <p class="muted">
+            Trabaja sobre una copia de la plantilla: algunos cambios del agente no se pueden deshacer con Ctrl+Z.
+          </p>
+        </div>
+      </main>
+
+      <div id="action-bar" class="action-bar" hidden>
+        <button id="btn-approve" class="primary" type="button">Aprobar y ejecutar</button>
+        <button id="btn-continue" class="primary" type="button" hidden>Continuar</button>
+        <span class="muted" id="action-hint">o escribe abajo los cambios al plan</span>
+      </div>
+
+      <footer class="composer" id="composer">
+        <div id="attachments" class="attachments"></div>
+        <textarea
+          id="input"
+          rows="4"
+          placeholder="Pega aquí las instrucciones (Ctrl+Enter para enviar)…"
+        ></textarea>
+        <div class="row">
+          <label class="ghost small attach" title="Adjuntar PDF o imagen con las instrucciones">
+            <input
+              id="file"
+              type="file"
+              accept="application/pdf,image/png,image/jpeg,image/gif,image/webp"
+              multiple
+              hidden
+            />
+            Adjuntar PDF
+          </label>
+          <span id="status" class="status"></span>
+          <button id="btn-stop" class="danger" type="button" hidden>Detener</button>
+          <button id="btn-send" class="primary" type="button">Enviar</button>
+        </div>
+        <div id="meta" class="meta"></div>
+      </footer>
+    </div>
+    <script type="module" src="/src/taskpane/main.ts"></script>
+  </body>
+</html>
