@@ -2,6 +2,15 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { describeOfficeError } from "../excel/office";
 import { truncate } from "../excel/text";
+import {
+  configurarHoja,
+  crearTabla,
+  filtrar,
+  formatoCondicional,
+  insertarEliminar,
+  quitarDuplicados,
+  tablaDinamica,
+} from "./advanced";
 import { crearGrafico } from "./chart";
 import { formatearRango } from "./format";
 import { ejecutarOfficeJs, entregarVba } from "./misc";
@@ -24,6 +33,13 @@ export const TOOLS: AgentTool[] = [
   gestionarHojas,
   validacionDatos,
   ordenar,
+  insertarEliminar,
+  quitarDuplicados,
+  formatoCondicional,
+  crearTabla,
+  tablaDinamica,
+  filtrar,
+  configurarHoja,
   crearGrafico,
   entregarVba,
   ejecutarOfficeJs,

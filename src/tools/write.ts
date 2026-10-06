@@ -46,7 +46,7 @@ export const escribirRango = defineTool({
     "celda sin cambios; \"\" la borra. Si `rango` es una sola celda, se usa como esquina superior izquierda. " +
     "Devuelve las celdas que quedaron con error para que las corrijas.",
   schema: z.object({
-    rango: z.string().describe("Celda inicial o rango destino, p. ej. \"'#1 - Amortización'!A8\"."),
+    rango: z.string().describe("Celda inicial o rango destino, p. ej. \"'Mi hoja'!A8\"."),
     datos: z.array(z.array(CellValue)).min(1).describe("Matriz de filas x columnas."),
     formato_numero: z
       .string()
@@ -116,7 +116,7 @@ export const dividirTexto = defineTool({
     "Texto en columnas: divide cada celda de una columna por un separador y escribe las partes en columnas " +
     "consecutivas a partir de `destino` (por defecto, sobre la misma columna de origen).",
   schema: z.object({
-    origen: z.string().describe("Rango de UNA columna, p. ej. \"'#1 - Inventario'!B3:B49\"."),
+    origen: z.string().describe("Rango de UNA columna, p. ej. \"'Mi hoja'!B2:B50\"."),
     separador: z.string().min(1).describe("Separador, p. ej. \";\"."),
     destino: z.string().optional().describe("Celda superior izquierda del resultado. Por defecto, la primera del origen."),
     recortar_espacios: z.boolean().default(true),
@@ -157,8 +157,8 @@ export const rellenarSerie = defineTool({
     "y `destino` el rango completo que debe quedar lleno (incluye el origen). Tipos: serie (1,2,3…), " +
     "meses/dias/anios (fechas), copiar, predeterminado (copia fórmulas ajustando referencias), formatos.",
   schema: z.object({
-    origen: z.string().describe("Celdas semilla, p. ej. \"'#1 - Amortización'!A8\" o \"A8:A9\"."),
-    destino: z.string().describe("Rango completo a rellenar, p. ej. \"'#1 - Amortización'!A8:A43\"."),
+    origen: z.string().describe("Celdas semilla, p. ej. \"'Mi hoja'!A2\" o \"A2:A3\"."),
+    destino: z.string().describe("Rango completo a rellenar, p. ej. \"'Mi hoja'!A2:A40\"."),
     tipo: z.enum(["serie", "meses", "dias", "anios", "copiar", "predeterminado", "formatos"]),
   }),
   writes: true,

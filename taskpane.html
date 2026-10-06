@@ -58,9 +58,10 @@
       <main id="log" aria-live="polite">
         <div id="empty" class="empty">
           <h2>¿Qué hay que hacer en este libro?</h2>
+          <p>Sirve para cualquier práctica, tarea o requerimiento de Excel.</p>
           <ol>
-            <li>Abre la plantilla en Excel.</li>
-            <li>Pega las instrucciones o adjunta el PDF.</li>
+            <li>Abre la plantilla o el libro en Excel.</li>
+            <li>Pega las instrucciones o adjunta el archivo (PDF, Word, texto o imagen). Si ya vienen dentro del libro, solo pídele que las resuelva.</li>
             <li>Revisa el plan y presiona <strong>Aprobar y ejecutar</strong>.</li>
           </ol>
           <p class="muted">
@@ -83,15 +84,9 @@
           placeholder="Pega aquí las instrucciones (Ctrl+Enter para enviar)…"
         ></textarea>
         <div class="row">
-          <label class="ghost small attach" title="Adjuntar PDF o imagen con las instrucciones">
-            <input
-              id="file"
-              type="file"
-              accept="application/pdf,image/png,image/jpeg,image/gif,image/webp"
-              multiple
-              hidden
-            />
-            Adjuntar PDF
+          <label class="ghost small attach" title="Adjuntar PDF, Word, texto o imagen con las instrucciones">
+            <input id="file" type="file" multiple hidden />
+            Adjuntar archivo
           </label>
           <span id="status" class="status"></span>
           <button id="btn-stop" class="danger" type="button" hidden>Detener</button>

@@ -88,7 +88,7 @@ export const validacionDatos = defineTool({
   name: "validacion_datos",
   description:
     "Configura la validación de datos de un rango. Para listas, `lista` puede ser una referencia con '=' " +
-    "(p. ej. \"='#1 - Inventario'!$C$3:$C$49\") o valores separados por comas (\"Sí,No\"). " +
+    "(p. ej. \"='Catálogo'!$A$2:$A$50\") o valores separados por comas (\"Sí,No\"). " +
     "`permitir_vacio` deja la celda en blanco como valor válido. tipo=\"ninguna\" quita la validación.",
   schema: z.object({
     rango: z.string(),
@@ -172,7 +172,7 @@ export const ordenar = defineTool({
     "Ordena las filas de un rango por una o más columnas (letras de columna de la hoja, p. ej. \"C\"). " +
     "Incluye en el rango todas las columnas que deben moverse juntas.",
   schema: z.object({
-    rango: z.string().describe("Rango de datos completo, p. ej. \"'#1 - Inventario'!A3:D49\"."),
+    rango: z.string().describe("Rango de datos completo, p. ej. \"'Mi hoja'!A1:D50\"."),
     claves: z
       .array(z.object({ columna: z.string().regex(/^[A-Za-z]{1,3}$/), ascendente: z.boolean().default(true) }))
       .min(1),

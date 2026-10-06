@@ -9,7 +9,8 @@ type ContentBlockParam = Anthropic.Beta.Messages.BetaContentBlockParam;
 type ToolResult = Anthropic.Beta.Messages.BetaToolResultBlockParam;
 type Usage = Anthropic.Beta.Messages.BetaUsage;
 
-const MAX_STEPS = 80;
+// Una práctica larga puede requerir muchos pasos; al llegar al límite el usuario puede continuar.
+const MAX_STEPS = 150;
 const BETAS = ["server-side-fallback-2026-07-01", "thinking-display-updates-2026-08-18"];
 
 export interface UsageTotals {

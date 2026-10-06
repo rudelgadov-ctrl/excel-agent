@@ -6,11 +6,12 @@ import { excelApiMinor } from "../excel/office";
 import { truncate } from "../excel/text";
 import type { VbaCard } from "../tools";
 import {
+  ACCEPT_ATTRIBUTE,
   MAX_ATTACHMENT_BYTES,
   buildUserContent,
+  classifyFile,
   formatSize,
-  normalizeMediaType,
-  readAsBase64,
+  readAttachment,
   type Attachment,
 } from "./attachments";
 import { renderMarkdown } from "./markdown";
@@ -355,9 +356,8 @@ function flashLogNotice(text: string, kind: "info" | "error" = "error"): void {
 
 async function addFiles(files: Iterable<File>): Promise<void> {
   for (const file of files) {
-    const mediaType = normalizeMediaType(file.name, file.type);
-    if (!mediaType) {
-      flashLogNotice(`No se puede adjuntar «${file.name}»: usa PDF, PNG, JPG, GIF o WEBP.`);
+    if (!classifyFile(file.name, file.type)) {
+      flashLogNotice(`No se puede adjuntar «${file.name}»: usa PDF, Word (.docx), texto o imágenes.`);
       continue;
     }
     const total = attachments.reduce((sum, a) => sum + a.size, 0) + file.size;
@@ -366,7 +366,8 @@ async function addFiles(files: Iterable<File>): Promise<void> {
       continue;
     }
     try {
-      attachments.push({ name: file.name, mediaType, data: await readAsBase64(file), size: file.size });
+      const attachment = await readAttachment(file);
+      if (attachment) attachments.push(attachment);
     } catch (err) {
       flashLogNotice(`No se pudo leer «${file.name}»: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -546,6 +547,7 @@ function wireEvents(): void {
 function start(host: Office.HostType | null): void {
   inExcel = host === Office.HostType.Excel;
   ui.hostWarning.hidden = inExcel;
+  ui.file.accept = ACCEPT_ATTRIBUTE;
   initSettingsForm();
   wireEvents();
   setBusy(false);

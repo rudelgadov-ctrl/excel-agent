@@ -1,8 +1,10 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { appendUserContent, prepareAssistantTurn } from "../src/agent/content";
+import { SYSTEM_PROMPT } from "../src/agent/systemPrompt";
 import { API_TOOLS, TOOLS, executeTool } from "../src/tools";
-import { buildUserContent, normalizeMediaType } from "../src/taskpane/attachments";
+import { buildUserContent, classifyFile, docxToText } from "../src/taskpane/attachments";
 import { renderMarkdown } from "../src/taskpane/markdown";
 
 type Block = Anthropic.Beta.Messages.BetaContentBlock;
@@ -97,18 +99,72 @@ describe("historial", () => {
 });
 
 describe("adjuntos", () => {
-  it("detecta el tipo por extensión si el sistema no lo informa", () => {
-    expect(normalizeMediaType("instrucciones.PDF", "")).toBe("application/pdf");
-    expect(normalizeMediaType("foto.jpg", "")).toBe("image/jpeg");
-    expect(normalizeMediaType("hoja.xlsx", "application/vnd.ms-excel")).toBeNull();
+  it("clasifica por extensión aunque el sistema no informe el tipo", () => {
+    expect(classifyFile("instrucciones.PDF", "")).toEqual({ kind: "pdf" });
+    expect(classifyFile("practica.docx", "")).toEqual({ kind: "word" });
+    expect(classifyFile("notas.txt", "")).toEqual({ kind: "text" });
+    expect(classifyFile("foto.jpg", "")).toEqual({ kind: "image", mediaType: "image/jpeg" });
+    expect(classifyFile("hoja.xlsx", "application/vnd.ms-excel")).toBeNull();
   });
 
-  it("pone los adjuntos antes del texto", () => {
+  it("pone los adjuntos antes del texto y usa documentos de texto para Word", () => {
     const content = buildUserContent("", [
-      { name: "p.pdf", mediaType: "application/pdf", data: "QUJD", size: 3 },
+      { name: "p.pdf", kind: "pdf", data: "QUJD", size: 3 },
+      { name: "p.docx", kind: "word", data: "a) Sume la columna B", size: 10 },
     ]);
-    expect(content.map((b) => b.type)).toEqual(["document", "text"]);
-    expect(content[1]).toMatchObject({ type: "text", text: expect.stringContaining("adjunto") });
+    expect(content.map((b) => b.type)).toEqual(["document", "document", "text"]);
+    expect(content[1]).toMatchObject({ source: { type: "text", data: "a) Sume la columna B" } });
+    expect(content[2]).toMatchObject({ type: "text", text: expect.stringContaining("adjunto") });
+  });
+
+  it("extrae el texto de un .docx (párrafos, tablas, entidades)", () => {
+    const xml =
+      '<w:document><w:body><w:p><w:r><w:t>Ejercicio #1</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t xml:space="preserve">a) Calcule el </w:t></w:r><w:r><w:t>total &amp; el IVA</w:t></w:r></w:p>' +
+      "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Mes</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Ventas</w:t></w:r></w:p></w:tc></w:tr></w:tbl>" +
+      '<w:p><w:r><w:instrText> PAGE </w:instrText></w:r></w:p></w:body></w:document>';
+    const docx = zipSync({ "word/document.xml": strToU8(xml), "[Content_Types].xml": strToU8("<Types/>") });
+    const text = docxToText(docx);
+    expect(text).toContain("Ejercicio #1");
+    expect(text).toContain("a) Calcule el total & el IVA");
+    expect(text).toMatch(/Mes\s*\n?\s*\|\s*\n?\s*Ventas/);
+    expect(text).not.toContain("PAGE");
+  });
+});
+
+describe("generalidad", () => {
+  // El agente debe servir para cualquier práctica: nada en el prompt ni en las
+  // herramientas puede depender de las prácticas usadas como referencia.
+  const specific = /Amortizaci|Inventario|Facturar|Librer[ií]a|Prec\. por|San Isidro|DN0102|Quiz/i;
+
+  it("el prompt de sistema no menciona prácticas concretas", () => {
+    expect(SYSTEM_PROMPT).not.toMatch(specific);
+    expect(SYSTEM_PROMPT).toMatch(/CUALQUIER práctica/);
+  });
+
+  it("las herramientas no mencionan prácticas concretas", () => {
+    expect(JSON.stringify(API_TOOLS)).not.toMatch(specific);
+  });
+
+  it("cubre los temas habituales de un curso de Excel", () => {
+    const names = API_TOOLS.map((t) => t.name);
+    for (const name of [
+      "formato_condicional",
+      "tabla_dinamica",
+      "crear_tabla",
+      "filtrar",
+      "ordenar",
+      "validacion_datos",
+      "crear_grafico",
+      "crear_nombre",
+      "rellenar_serie",
+      "insertar_eliminar",
+      "quitar_duplicados",
+      "configurar_hoja",
+      "entregar_vba",
+    ]) {
+      expect(names).toContain(name);
+    }
   });
 });
 

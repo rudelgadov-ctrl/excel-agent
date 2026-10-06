@@ -8,7 +8,7 @@ export const entregarVba = defineTool({
     "Úsala cuando el requerimiento pida grabar o crear una macro: el complemento no puede crear macros por sí mismo. " +
     "El código debe ser un módulo estándar completo (Option Explicit + Sub NombreMacro()) que use las celdas reales del libro.",
   schema: z.object({
-    nombre_macro: z.string().describe("Nombre del Sub, p. ej. \"Facturar\"."),
+    nombre_macro: z.string().describe("Nombre del Sub, el que pida la instrucción, p. ej. \"ActualizarTotales\"."),
     codigo: z.string().describe("Código VBA completo del módulo."),
     descripcion: z.string().optional().describe("Qué hace la macro, en una o dos frases."),
     como_ejecutar: z.string().optional().describe("Indicación extra (p. ej. asignarla a un botón)."),

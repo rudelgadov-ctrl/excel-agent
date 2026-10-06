@@ -4,6 +4,19 @@ Complemento de Office (Excel) con un panel de chat que llama a la API de Claude 
 y ejecuta herramientas Office.js sobre el libro abierto. TypeScript + Vite; publicado en GitHub Pages
 (`https://rudelgadov-ctrl.github.io/excel-agent/`) por `.github/workflows/deploy.yml` en cada push a `main`.
 
+## Requisito central: generalidad
+
+El agente debe resolver **cualquier** práctica o requerimiento de Excel, incluidas prácticas futuras que
+nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de trabajo, nunca el objetivo:
+
+- No escribir lógica, ejemplos ni reglas atadas a una práctica concreta (nombres de hojas, celdas,
+  macros o datos de ejemplo). `tests/agent.test.ts` ("generalidad") falla si el prompt o las
+  herramientas mencionan una.
+- Cuando una práctica nueva falle, corregir la capacidad general que faltó (una herramienta, una regla
+  del prompt), no el caso particular.
+- Lo que la API de Office.js no permite (macros, Buscar objetivo, Solver, tablas de datos, minigráficos)
+  se resuelve con alternativa + VBA o pasos manuales; nunca se omite en silencio.
+
 ## Comandos
 
 - `npm test`: vitest (helpers puros, esquemas de herramientas, bucle, markdown).
@@ -19,6 +32,8 @@ y ejecuta herramientas Office.js sobre el libro abierto. TypeScript + Vite; publ
 - Aprobación del plan: las herramientas con `writes: true` devuelven `BLOQUEADO` hasta que el usuario
   aprueba (o modo automático). El estado viaja como nota al final de cada mensaje de usuario
   (`STATUS` en `systemPrompt.ts`), no en el prompt de sistema, para no romper la caché.
+- Adjuntos (`src/taskpane/attachments.ts`): PDF e imágenes van en base64; Word (.docx, con fflate) y
+  texto se envían como documentos de texto.
 - `src/tools/`: cada herramienta es `defineTool({ name, description, schema (zod), writes, run })`.
   El JSON Schema para la API sale de `z.toJSONSchema(..., { io: "input" })` en `tools/index.ts`.
   Registrar herramientas nuevas en `TOOLS`.

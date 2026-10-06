@@ -11,9 +11,10 @@ function isEmpty(v: unknown): boolean {
 export const leerLibro = defineTool({
   name: "leer_libro",
   description:
-    "Resumen del libro abierto: hojas (con su rango usado, celdas combinadas, gráficos y tablas), " +
-    "nombres definidos, hoja activa, versión de ExcelApi soportada y una vista previa de las celdas no vacías " +
-    "de cada hoja (fórmulas incluidas). Úsala siempre al empezar.",
+    "Resumen del libro abierto: hojas (con su rango usado, celdas combinadas, gráficos, tablas, tablas " +
+    "dinámicas y texto de cuadros de texto), nombres definidos, hoja activa, versión de ExcelApi soportada y " +
+    "una vista previa de las celdas no vacías de cada hoja (fórmulas incluidas). Úsala siempre al empezar: " +
+    "a veces las instrucciones vienen dentro del propio libro.",
   schema: z.object({
     max_celdas_por_hoja: z
       .number()
@@ -90,6 +91,13 @@ export const leerLibro = defineTool({
         };
       });
 
+      const textos = await readShapeTexts(context, perSheet.map((p) => p.ws));
+      const dinamicas = await readPivotNames(context, perSheet.map((p) => p.ws));
+      hojas.forEach((h, i) => {
+        if (textos[i]?.length) Object.assign(h, { cuadros_de_texto: textos[i] });
+        if (dinamicas[i]?.length) Object.assign(h, { tablas_dinamicas: dinamicas[i] });
+      });
+
       return {
         hoja_activa: active.name,
         excel_api: `1.${excelApiMinor()}`,
@@ -100,6 +108,57 @@ export const leerLibro = defineTool({
   },
 });
 
+/**
+ * Texto de las formas (cuadros de texto) de cada hoja: algunas plantillas traen ahí las
+ * instrucciones. Es información opcional, así que cualquier fallo se ignora.
+ */
+async function readShapeTexts(
+  context: Excel.RequestContext,
+  sheets: Excel.Worksheet[],
+): Promise<{ nombre: string; texto: string }[][]> {
+  if (!supports(9)) return [];
+  try {
+    const shapes = sheets.map((ws) => {
+      const s = ws.shapes;
+      s.load("items/name,items/type");
+      return s;
+    });
+    await context.sync();
+    const withFrame = shapes.map((s) =>
+      s.items
+        .filter((shape) => shape.type === Excel.ShapeType.geometricShape)
+        .map((shape) => {
+          shape.textFrame.load("hasText");
+          shape.textFrame.textRange.load("text");
+          return shape;
+        }),
+    );
+    await context.sync();
+    return withFrame.map((list) =>
+      list
+        .filter((shape) => shape.textFrame.hasText)
+        .map((shape) => ({ nombre: shape.name, texto: shape.textFrame.textRange.text.slice(0, 4000) })),
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function readPivotNames(context: Excel.RequestContext, sheets: Excel.Worksheet[]): Promise<string[][]> {
+  if (!supports(8)) return [];
+  try {
+    const pivots = sheets.map((ws) => {
+      const p = ws.pivotTables;
+      p.load("items/name");
+      return p;
+    });
+    await context.sync();
+    return pivots.map((p) => p.items.map((pt) => pt.name));
+  } catch {
+    return [];
+  }
+}
+
 export const leerRango = defineTool({
   name: "leer_rango",
   description:
@@ -107,7 +166,7 @@ export const leerRango = defineTool({
     "antes de escribir y para verificar el resultado después. Referencias: \"'Nombre de hoja'!A1:C10\", " +
     "\"A1\" (hoja activa) o un nombre definido.",
   schema: z.object({
-    rango: z.string().describe("Rango a leer, p. ej. \"'#1 - Amortización'!A1:E20\"."),
+    rango: z.string().describe("Rango a leer, p. ej. \"'Mi hoja'!A1:E20\"."),
     incluir_formatos: z
       .boolean()
       .default(false)
