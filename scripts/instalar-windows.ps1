@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Registra el complemento "Agente Excel" en Excel para Windows (solo para el usuario actual).
 
