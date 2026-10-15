@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { columnToIndex } from "../excel/address";
-import { getRange, getSheet, supports } from "../excel/office";
-import { defineTool } from "./types";
+import { columnToIndex } from "../../excel/address";
+import { getRange, getSheet, supports } from "../../excel/office";
+import { defineTool } from "../types";
 
 function requireApi(minor: number, feature: string): void {
   if (!supports(minor)) throw new Error(`${feature} requiere ExcelApi 1.${minor}; esta versión de Excel no la tiene.`);

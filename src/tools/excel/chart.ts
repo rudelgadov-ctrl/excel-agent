@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getRange, getSheet, supports } from "../excel/office";
-import { defineTool } from "./types";
+import { getRange, getSheet, supports } from "../../excel/office";
+import { defineTool } from "../types";
 
 const LEGEND = { derecha: "Right", izquierda: "Left", arriba: "Top", abajo: "Bottom" } as const;
 

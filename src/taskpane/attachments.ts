@@ -104,29 +104,36 @@ export async function readAttachment(file: File): Promise<Attachment | null> {
   }
 }
 
-export const DEFAULT_REQUEST = "Resuelve en este libro todos los requerimientos del archivo adjunto.";
+export const defaultRequest = (doc = "libro"): string =>
+  `Resuelve en este ${doc} todos los requerimientos del archivo adjunto.`;
 
 /** Arma el contenido del mensaje: primero los adjuntos, luego el texto. */
-export function buildUserContent(text: string, attachments: Attachment[]): ContentBlockParam[] {
-  const blocks: ContentBlockParam[] = attachments.map((a): ContentBlockParam => {
+export function buildUserContent(text: string, attachments: Attachment[], doc = "libro"): ContentBlockParam[] {
+  const blocks: ContentBlockParam[] = attachments.flatMap((a): ContentBlockParam[] => {
     switch (a.kind) {
       case "pdf":
-        return { type: "document", source: { type: "base64", media_type: "application/pdf", data: a.data }, title: a.name };
+        return [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: a.data }, title: a.name }];
       case "image":
-        return { type: "image", source: { type: "base64", media_type: a.mediaType ?? "image/png", data: a.data } };
+        // El nombre permite insertar la imagen en el archivo (insertar_imagen).
+        return [
+          { type: "text", text: `Imagen adjunta «${a.name}»:` },
+          { type: "image", source: { type: "base64", media_type: a.mediaType ?? "image/png", data: a.data } },
+        ];
       case "word":
       case "text":
-        return {
-          type: "document",
-          source: { type: "text", media_type: "text/plain", data: a.data || "(documento vacío)" },
-          title: a.name,
-          ...(a.kind === "word"
-            ? { context: "Texto extraído de un .docx; las imágenes y la numeración automática no se conservan." }
-            : {}),
-        };
+        return [
+          {
+            type: "document",
+            source: { type: "text", media_type: "text/plain", data: a.data || "(documento vacío)" },
+            title: a.name,
+            ...(a.kind === "word"
+              ? { context: "Texto extraído de un .docx; las imágenes y la numeración automática no se conservan." }
+              : {}),
+          },
+        ];
     }
   });
-  blocks.push({ type: "text", text: text.trim() || DEFAULT_REQUEST });
+  blocks.push({ type: "text", text: text.trim() || defaultRequest(doc) });
   return blocks;
 }
 

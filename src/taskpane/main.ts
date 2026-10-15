@@ -1,10 +1,12 @@
 import "./styles.css";
 import type Anthropic from "@anthropic-ai/sdk";
-import { ExcelAgent, type AgentEvents, type Approval, type TurnEnd } from "../agent/loop";
+import { HOSTS, type HostKind, type HostProfile } from "../agent/hosts";
+import { OfficeAgent, type AgentEvents, type Approval, type TurnEnd } from "../agent/loop";
 import { EFFORTS, MODELS, loadSettings, modelInfo, saveSettings, type Effort, type Settings } from "../agent/settings";
 import { excelApiMinor } from "../excel/office";
 import { truncate } from "../excel/text";
-import type { VbaCard } from "../tools";
+import type { ImageFile, ToolEnv, VbaCard } from "../tools";
+import { wordApiMinor } from "../word/office";
 import {
   ACCEPT_ATTRIBUTE,
   MAX_ATTACHMENT_BYTES,
@@ -23,6 +25,10 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getEleme
 const ui = {
   log: $("log"),
   empty: $("empty"),
+  brandName: $("brand-name"),
+  emptyTitle: $("empty-title"),
+  emptyScope: $("empty-scope"),
+  emptyOpen: $("empty-open"),
   hostWarning: $("host-warning"),
   settings: $("settings"),
   setKey: $<HTMLInputElement>("set-key"),
@@ -57,6 +63,29 @@ const TOOL_LABELS: Record<string, string> = {
   validacion_datos: "Validación de datos",
   ordenar: "Ordenando",
   crear_grafico: "Gráfico",
+  insertar_eliminar: "Insertar o eliminar",
+  quitar_duplicados: "Quitando duplicados",
+  formato_condicional: "Formato condicional",
+  crear_tabla: "Tabla",
+  tabla_dinamica: "Tabla dinámica",
+  filtrar: "Filtrando",
+  configurar_hoja: "Configurando la hoja",
+  leer_documento: "Leyendo el documento",
+  leer_tabla: "Leyendo la tabla",
+  insertar_contenido: "Escribiendo",
+  eliminar_contenido: "Eliminando",
+  formato_texto: "Formato de texto",
+  formato_parrafo: "Formato de párrafo",
+  aplicar_lista: "Lista",
+  modificar_estilo: "Estilo",
+  insertar_tabla: "Insertando tabla",
+  editar_tabla: "Editando tabla",
+  formato_tabla: "Formato de tabla",
+  configurar_pagina: "Configurando la página",
+  insertar_salto: "Salto",
+  insertar_campo: "Campo",
+  insertar_vinculo_o_nota: "Vínculo o nota",
+  insertar_imagen: "Imagen",
   entregar_vba: "Macro VBA",
   ejecutar_office_js: "Código Office.js",
 };
@@ -64,15 +93,22 @@ const TOOL_LABELS: Record<string, string> = {
 let settings: Settings = loadSettings();
 let attachments: Attachment[] = [];
 let currentTurn: TurnView | null = null;
-let inExcel = false;
+/** El panel está dentro de Excel o Word (y no en un navegador u otra aplicación). */
+let inHost = false;
 let resetWhenIdle = false;
+/** Imágenes adjuntadas en esta conversación, para que el agente pueda insertarlas en el archivo. */
+let sessionImages: ImageFile[] = [];
 
-const agent = new ExcelAgent({
+const env: ToolEnv = {
   showVba(card) {
     const turn = currentTurn ?? new TurnView();
-    turn.addBlock(vbaCard(card));
+    turn.addBlock(vbaCard(card, agent.host.kind));
   },
-});
+  images: () => sessionImages,
+};
+
+// Se reemplaza al arrancar si el complemento se abrió en Word.
+let agent = new OfficeAgent(HOSTS.excel, env);
 
 // ---------- utilidades de DOM ----------
 
@@ -135,12 +171,25 @@ function prettyJson(raw: unknown): string {
   }
 }
 
+/** Resumen corto del objetivo de una herramienta de Word ({ parrafos, tabla, texto, zona… }). */
+function describeObjetivo(o: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (o.zona === "encabezado" || o.zona === "pie") parts.push(o.zona === "pie" ? "pie de página" : "encabezado");
+  if (o.seleccion) parts.push("selección");
+  if (typeof o.parrafos === "string") parts.push(`párrafos ${o.parrafos}`);
+  if (typeof o.tabla === "number") parts.push(`tabla ${o.tabla}`);
+  if (typeof o.texto === "string") parts.push(`«${truncate(o.texto, 40)}»`);
+  return parts.join(" · ") || "documento";
+}
+
 function toolTarget(input: unknown): string {
   if (!input || typeof input !== "object") return "";
   const o = input as Record<string, unknown>;
-  for (const key of ["rango", "destino", "origen", "hoja", "nombre", "nombre_macro", "descripcion"]) {
-    if (typeof o[key] === "string") return o[key] as string;
+  for (const key of ["rango", "destino", "origen", "hoja", "nombre", "nombre_macro", "adjunto", "codigo", "descripcion"]) {
+    if (typeof o[key] === "string") return truncate(o[key] as string, 60);
   }
+  if (o.objetivo && typeof o.objetivo === "object") return describeObjetivo(o.objetivo as Record<string, unknown>);
+  if (typeof o.tabla === "number") return `tabla ${o.tabla}`;
   return "";
 }
 
@@ -247,7 +296,38 @@ class TurnView {
   }
 }
 
-function vbaCard(card: VbaCard): HTMLElement {
+const VBA_STEPS: Record<HostKind, { windows: string[]; mac: string[] }> = {
+  excel: {
+    windows: [
+      "Archivo > Guardar como > «Libro de Excel habilitado para macros (*.xlsm)».",
+      "Alt+F11 abre el editor de VBA. Menú Insertar > Módulo.",
+      "Pega el código y cierra el editor.",
+      "Ejecuta con Alt+F8 > {macro} > Ejecutar (o asígnala a un botón: Programador > Insertar > Botón).",
+    ],
+    mac: [
+      "Archivo > Guardar como > formato «Libro de Excel habilitado para macros (.xlsm)».",
+      "Herramientas > Macro > Editor de Visual Basic. Menú Insert > Module.",
+      "Pega el código y cierra el editor.",
+      "Herramientas > Macro > Macros… > {macro} > Ejecutar.",
+    ],
+  },
+  word: {
+    windows: [
+      "Archivo > Guardar como > «Documento habilitado con macros de Word (*.docm)».",
+      "Alt+F11 abre el editor de VBA. En el panel de la izquierda selecciona tu documento y luego Insertar > Módulo.",
+      "Pega el código y cierra el editor.",
+      "Ejecuta con Alt+F8 > {macro} > Ejecutar (o agrégala a la barra de acceso rápido).",
+    ],
+    mac: [
+      "Archivo > Guardar como > formato «Documento de Word habilitado para macros (.docm)».",
+      "Herramientas > Macro > Editor de Visual Basic. Selecciona tu documento y luego Insert > Module.",
+      "Pega el código y cierra el editor.",
+      "Herramientas > Macro > Macros… > {macro} > Ejecutar.",
+    ],
+  },
+};
+
+function vbaCard(card: VbaCard, host: HostKind): HTMLElement {
   const box = el("div", "vba");
   box.append(el("h4", undefined, `Macro VBA: ${card.nombre}`));
   if (card.descripcion) box.append(el("p", undefined, card.descripcion));
@@ -274,20 +354,8 @@ function vbaCard(card: VbaCard): HTMLElement {
     wrap.append(ol);
     return wrap;
   };
-  steps.append(
-    list("Windows", [
-      "Archivo > Guardar como > «Libro de Excel habilitado para macros (*.xlsm)».",
-      "Alt+F11 abre el editor de VBA. Menú Insertar > Módulo.",
-      "Pega el código y cierra el editor.",
-      `Ejecuta con Alt+F8 > ${card.nombre} > Ejecutar (o asígnala a un botón: Programador > Insertar > Botón).`,
-    ]),
-    list("Mac", [
-      "Archivo > Guardar como > formato «Libro de Excel habilitado para macros (.xlsm)».",
-      "Herramientas > Macro > Editor de Visual Basic. Menú Insert > Module.",
-      "Pega el código y cierra el editor.",
-      `Herramientas > Macro > Macros… > ${card.nombre} > Ejecutar.`,
-    ]),
-  );
+  const fill = (items: string[]) => items.map((item) => item.replace("{macro}", card.nombre));
+  steps.append(list("Windows", fill(VBA_STEPS[host].windows)), list("Mac", fill(VBA_STEPS[host].mac)));
   box.append(steps);
   if (card.comoEjecutar) box.append(el("p", "muted", card.comoEjecutar));
   return box;
@@ -296,7 +364,7 @@ function vbaCard(card: VbaCard): HTMLElement {
 // ---------- estado de la interfaz ----------
 
 function setBusy(busy: boolean): void {
-  ui.btnSend.disabled = busy || !inExcel;
+  ui.btnSend.disabled = busy || !inHost;
   ui.btnStop.hidden = !busy;
   ui.btnApprove.disabled = busy;
   ui.btnContinue.disabled = busy;
@@ -308,7 +376,7 @@ function setStatus(text: string): void {
 
 function updateMeta(): void {
   const model = modelInfo(settings.model).label.replace(/\s*\(.*\)$/, "");
-  const api = inExcel ? ` · ExcelApi 1.${excelApiMinor()}` : "";
+  const api = !inHost ? "" : agent.host.kind === "word" ? ` · WordApi 1.${wordApiMinor()}` : ` · ExcelApi 1.${excelApiMinor()}`;
   const cost = agent.usage.costUsd > 0 ? ` · ≈ US$${agent.usage.costUsd.toFixed(2)} en esta conversación` : "";
   const mode = settings.autoMode ? " · modo automático" : "";
   ui.meta.textContent = `${model}${api}${mode}${cost}`;
@@ -437,12 +505,16 @@ function requireApiKey(): boolean {
 }
 
 async function onSend(): Promise<void> {
-  if (agent.busy || !inExcel) return;
+  if (agent.busy || !inHost) return;
   const text = ui.input.value.trim();
   if (!text && attachments.length === 0) return;
   if (!requireApiKey()) return;
   const files = attachments;
-  const content = buildUserContent(text, files);
+  const content = buildUserContent(text, files, agent.host.doc);
+  for (const f of files) {
+    if (f.kind !== "image") continue;
+    sessionImages = [...sessionImages.filter((i) => i.name !== f.name), { name: f.name, data: f.data, mediaType: f.mediaType ?? "image/png" }];
+  }
   ui.input.value = "";
   attachments = [];
   renderAttachments();
@@ -467,6 +539,7 @@ function onNewConversation(): void {
     return;
   }
   agent.reset();
+  sessionImages = [];
   currentTurn = null;
   ui.log.replaceChildren(ui.empty);
   ui.empty.hidden = false;
@@ -544,9 +617,38 @@ function wireEvents(): void {
   });
 }
 
-function start(host: Office.HostType | null): void {
-  inExcel = host === Office.HostType.Excel;
-  ui.hostWarning.hidden = inExcel;
+/** Requisitos mínimos de la API (el manifiesto ya no los exige para poder cargarse en ambas aplicaciones). */
+const MIN_API: Record<HostKind, [string, string]> = { excel: ["ExcelApi", "1.7"], word: ["WordApi", "1.3"] };
+
+function applyHost(host: HostProfile): void {
+  const name = `Agente ${host.app}`;
+  document.title = name;
+  ui.brandName.textContent = name;
+  ui.emptyTitle.textContent = `¿Qué hay que hacer en este ${host.doc}?`;
+  ui.emptyScope.textContent = `Sirve para cualquier práctica, tarea o requerimiento de ${host.app}.`;
+  ui.emptyOpen.textContent =
+    host.kind === "word" ? "Abre la plantilla o el documento en Word." : "Abre la plantilla o el libro en Excel.";
+}
+
+function start(officeHost: Office.HostType | null): void {
+  const kind: HostKind | null =
+    officeHost === Office.HostType.Excel ? "excel" : officeHost === Office.HostType.Word ? "word" : null;
+  inHost = kind !== null;
+  if (kind) {
+    agent = new OfficeAgent(HOSTS[kind], env);
+    applyHost(HOSTS[kind]);
+    const [set, version] = MIN_API[kind];
+    if (!Office.context.requirements.isSetSupported(set, version)) {
+      ui.hostWarning.textContent =
+        `Esta versión de ${HOSTS[kind].app} es demasiado antigua (requiere ${set} ${version}): usa Microsoft 365 o ` +
+        `${HOSTS[kind].app} 2019 o posterior. Algunas funciones pueden fallar.`;
+      ui.hostWarning.hidden = false;
+    } else {
+      ui.hostWarning.hidden = true;
+    }
+  } else {
+    ui.hostWarning.hidden = false;
+  }
   ui.file.accept = ACCEPT_ATTRIBUTE;
   initSettingsForm();
   wireEvents();

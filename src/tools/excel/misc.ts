@@ -1,24 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "./types";
-
-export const entregarVba = defineTool({
-  name: "entregar_vba",
-  description:
-    "Muestra al usuario un módulo VBA completo (con botón Copiar e instrucciones para Windows y Mac). " +
-    "Úsala cuando el requerimiento pida grabar o crear una macro: el complemento no puede crear macros por sí mismo. " +
-    "El código debe ser un módulo estándar completo (Option Explicit + Sub NombreMacro()) que use las celdas reales del libro.",
-  schema: z.object({
-    nombre_macro: z.string().describe("Nombre del Sub, el que pida la instrucción, p. ej. \"ActualizarTotales\"."),
-    codigo: z.string().describe("Código VBA completo del módulo."),
-    descripcion: z.string().optional().describe("Qué hace la macro, en una o dos frases."),
-    como_ejecutar: z.string().optional().describe("Indicación extra (p. ej. asignarla a un botón)."),
-  }),
-  writes: false,
-  async run({ nombre_macro, codigo, descripcion, como_ejecutar }, env) {
-    env.showVba({ nombre: nombre_macro, codigo, descripcion, comoEjecutar: como_ejecutar });
-    return { mostrado: true, nota: "El usuario ve el código con instrucciones para pegarlo y guardar como .xlsm." };
-  },
-});
+import { defineTool } from "../types";
 
 // Constructor de funciones async para ejecutar el código generado por el agente.
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor as new (

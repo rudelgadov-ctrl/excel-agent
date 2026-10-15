@@ -2,7 +2,7 @@
   "name": "excel-agent",
   "version": "0.1.0",
   "private": true,
-  "description": "Complemento de Excel con un agente (Claude) que ejecuta requerimientos sobre el libro abierto.",
+  "description": "Complemento de Excel y Word con un agente (Claude) que ejecuta requerimientos sobre el libro o documento abierto.",
   "type": "module",
   "scripts": {
     "dev": "vite",

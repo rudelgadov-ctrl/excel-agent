@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { fillMatrix } from "../excel/address";
-import { cellAddress, getRange, supports } from "../excel/office";
-import { dateSeries, linearSeries, repeatPattern, type DateUnit } from "../excel/series";
-import { findErrors, splitRows } from "../excel/text";
-import { defineTool } from "./types";
+import { fillMatrix } from "../../excel/address";
+import { cellAddress, getRange, supports } from "../../excel/office";
+import { dateSeries, linearSeries, repeatPattern, type DateUnit } from "../../excel/series";
+import { findErrors, splitRows } from "../../excel/text";
+import { defineTool } from "../types";
 
 const CellValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 type Cell = z.infer<typeof CellValue>;

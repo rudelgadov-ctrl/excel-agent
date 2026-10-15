@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  Registra el complemento "Agente Excel" en Excel para Windows (solo para el usuario actual).
+  Registra el complemento "Agente Office" en Excel y Word para Windows (solo para el usuario actual).
 
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File scripts\instalar-windows.ps1
@@ -22,6 +22,7 @@ if (-not (Test-Path $manifest)) { throw "No se encontró $manifest" }
 $id = $xml.OfficeApp.Id
 
 # Misma clave que usa office-addin-dev-settings para cargar complementos de desarrollo.
+# Es común a todas las aplicaciones de Office: el manifiesto indica que el complemento es para Excel y Word.
 $key = "HKCU:\Software\Microsoft\Office\16.0\WEF\Developer"
 
 if ($Desinstalar) {
@@ -35,4 +36,4 @@ if (-not (Test-Path $key)) { New-Item -Path $key -Force | Out-Null }
 Set-ItemProperty -Path $key -Name $id -Value $manifest
 
 Write-Host "Listo: $file registrado."
-Write-Host "Cierra Excel por completo y vuelve a abrirlo. El botón 'Agente Excel' aparece en la pestaña Inicio."
+Write-Host "Cierra Excel y Word por completo y vuelve a abrirlos. El botón 'Agente Excel' o 'Agente Word' aparece en la pestaña Inicio."

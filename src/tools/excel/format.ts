@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { fillMatrix } from "../excel/address";
-import { getRange } from "../excel/office";
-import { defineTool } from "./types";
+import { fillMatrix } from "../../excel/address";
+import { getRange } from "../../excel/office";
+import { defineTool } from "../types";
 
 const BORDER_SIDES = {
   superior: ["EdgeTop"],

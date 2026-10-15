@@ -8,19 +8,15 @@
   <Version>1.0.0.0</Version>
   <ProviderName>rudelgadov-ctrl</ProviderName>
   <DefaultLocale>es-ES</DefaultLocale>
-  <DisplayName DefaultValue="Agente Excel"/>
-  <Description DefaultValue="Agente con Claude que ejecuta requerimientos (instrucciones o PDF) sobre el libro abierto."/>
+  <DisplayName DefaultValue="Agente Office"/>
+  <Description DefaultValue="Agente con Claude que ejecuta requerimientos (instrucciones o PDF) sobre el libro de Excel o el documento de Word abierto."/>
   <IconUrl DefaultValue="https://rudelgadov-ctrl.github.io/excel-agent/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="https://rudelgadov-ctrl.github.io/excel-agent/assets/icon-64.png"/>
   <SupportUrl DefaultValue="https://github.com/rudelgadov-ctrl/excel-agent"/>
   <Hosts>
     <Host Name="Workbook"/>
+    <Host Name="Document"/>
   </Hosts>
-  <Requirements>
-    <Sets DefaultMinVersion="1.1">
-      <Set Name="ExcelApi" MinVersion="1.7"/>
-    </Sets>
-  </Requirements>
   <DefaultSettings>
     <SourceLocation DefaultValue="https://rudelgadov-ctrl.github.io/excel-agent/taskpane.html"/>
   </DefaultSettings>
@@ -30,8 +26,8 @@
       <Host xsi:type="Workbook">
         <DesktopFormFactor>
           <GetStarted>
-            <Title resid="GetStarted.Title"/>
-            <Description resid="GetStarted.Description"/>
+            <Title resid="GetStarted.Title.Excel"/>
+            <Description resid="GetStarted.Description.Excel"/>
             <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
           </GetStarted>
           <FunctionFile resid="Commands.Url"/>
@@ -45,10 +41,10 @@
                   <bt:Image size="80" resid="Icon.80x80"/>
                 </Icon>
                 <Control xsi:type="Button" id="ExcelAgent.OpenButton">
-                  <Label resid="Button.Label"/>
+                  <Label resid="Button.Label.Excel"/>
                   <Supertip>
-                    <Title resid="Button.Label"/>
-                    <Description resid="Button.Tooltip"/>
+                    <Title resid="Button.Label.Excel"/>
+                    <Description resid="Button.Tooltip.Excel"/>
                   </Supertip>
                   <Icon>
                     <bt:Image size="16" resid="Icon.16x16"/>
@@ -57,6 +53,44 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <TaskpaneId>ExcelAgent.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title.Word"/>
+            <Description resid="GetStarted.Description.Word"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <FunctionFile resid="Commands.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="WordAgent.Group">
+                <Label resid="Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Icon.16x16"/>
+                  <bt:Image size="32" resid="Icon.32x32"/>
+                  <bt:Image size="80" resid="Icon.80x80"/>
+                </Icon>
+                <Control xsi:type="Button" id="WordAgent.OpenButton">
+                  <Label resid="Button.Label.Word"/>
+                  <Supertip>
+                    <Title resid="Button.Label.Word"/>
+                    <Description resid="Button.Tooltip.Word"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Icon.16x16"/>
+                    <bt:Image size="32" resid="Icon.32x32"/>
+                    <bt:Image size="80" resid="Icon.80x80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>WordAgent.Taskpane</TaskpaneId>
                     <SourceLocation resid="Taskpane.Url"/>
                   </Action>
                 </Control>
@@ -78,13 +112,17 @@
         <bt:Url id="Taskpane.Url" DefaultValue="https://rudelgadov-ctrl.github.io/excel-agent/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GetStarted.Title" DefaultValue="Agente Excel está listo"/>
+        <bt:String id="GetStarted.Title.Excel" DefaultValue="Agente Excel está listo"/>
+        <bt:String id="GetStarted.Title.Word" DefaultValue="Agente Word está listo"/>
         <bt:String id="Group.Label" DefaultValue="Agente"/>
-        <bt:String id="Button.Label" DefaultValue="Agente Excel"/>
+        <bt:String id="Button.Label.Excel" DefaultValue="Agente Excel"/>
+        <bt:String id="Button.Label.Word" DefaultValue="Agente Word"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="GetStarted.Description" DefaultValue="Abre el panel desde Inicio &gt; Agente Excel, pega las instrucciones o adjunta el PDF y aprueba el plan."/>
-        <bt:String id="Button.Tooltip" DefaultValue="Abre el agente para ejecutar requerimientos sobre este libro."/>
+        <bt:String id="GetStarted.Description.Excel" DefaultValue="Abre el panel desde Inicio &gt; Agente Excel, pega las instrucciones o adjunta el PDF y aprueba el plan."/>
+        <bt:String id="GetStarted.Description.Word" DefaultValue="Abre el panel desde Inicio &gt; Agente Word, pega las instrucciones o adjunta el PDF y aprueba el plan."/>
+        <bt:String id="Button.Tooltip.Excel" DefaultValue="Abre el agente para ejecutar requerimientos sobre este libro."/>
+        <bt:String id="Button.Tooltip.Word" DefaultValue="Abre el agente para ejecutar requerimientos sobre este documento."/>
       </bt:LongStrings>
     </Resources>
   </VersionOverrides>

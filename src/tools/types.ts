@@ -8,16 +8,25 @@ export interface VbaCard {
   comoEjecutar?: string;
 }
 
+/** Imagen adjuntada por el usuario en la conversación (base64 sin el prefijo data:). */
+export interface ImageFile {
+  name: string;
+  data: string;
+  mediaType: string;
+}
+
 /** Lo que el panel expone a las herramientas. */
 export interface ToolEnv {
   showVba(card: VbaCard): void;
+  /** Imágenes adjuntadas en esta conversación, para insertarlas en el archivo. */
+  images(): ImageFile[];
 }
 
 export interface AgentTool<S extends z.ZodType = z.ZodType> {
   name: string;
   description: string;
   schema: S;
-  /** Modifica el libro: requiere que el usuario haya aprobado el plan. */
+  /** Modifica el archivo: requiere que el usuario haya aprobado el plan. */
   writes: boolean;
   run(input: z.infer<S>, env: ToolEnv): Promise<unknown>;
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Agente Excel</title>
+    <title>Agente Office</title>
     <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   </head>
   <body>
@@ -11,7 +11,7 @@
       <header class="topbar">
         <div class="brand">
           <img src="/assets/icon-32.png" alt="" width="20" height="20" />
-          <span>Agente Excel</span>
+          <span id="brand-name">Agente Office</span>
         </div>
         <div class="topbar-actions">
           <button id="btn-new" class="ghost" type="button" title="Empezar una conversación nueva">Nueva</button>
@@ -20,7 +20,7 @@
       </header>
 
       <div id="host-warning" class="banner warn" hidden>
-        Este panel funciona dentro de Excel. Ábrelo desde Inicio &gt; Agente Excel.
+        Este panel funciona dentro de Excel o Word. Ábrelo desde la pestaña Inicio &gt; Agente.
       </div>
 
       <section id="settings" class="settings" hidden>
@@ -57,11 +57,11 @@
 
       <main id="log" aria-live="polite">
         <div id="empty" class="empty">
-          <h2>¿Qué hay que hacer en este libro?</h2>
-          <p>Sirve para cualquier práctica, tarea o requerimiento de Excel.</p>
+          <h2 id="empty-title">¿Qué hay que hacer en este archivo?</h2>
+          <p id="empty-scope">Sirve para cualquier práctica, tarea o requerimiento de Excel o Word.</p>
           <ol>
-            <li>Abre la plantilla o el libro en Excel.</li>
-            <li>Pega las instrucciones o adjunta el archivo (PDF, Word, texto o imagen). Si ya vienen dentro del libro, solo pídele que las resuelva.</li>
+            <li id="empty-open">Abre la plantilla en Excel o en Word.</li>
+            <li>Pega las instrucciones o adjunta el archivo (PDF, Word, texto o imagen). Si ya vienen dentro del archivo, solo pídele que las resuelva.</li>
             <li>Revisa el plan y presiona <strong>Aprobar y ejecutar</strong>.</li>
           </ol>
           <p class="muted">

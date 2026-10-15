@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { cellAddress, excelApiMinor, getRange, supports } from "../excel/office";
-import { defineTool } from "./types";
+import { cellAddress, excelApiMinor, getRange, supports } from "../../excel/office";
+import { defineTool } from "../types";
 
 type Cell = string | number | boolean | null;
 

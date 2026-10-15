@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { columnToIndex } from "../excel/address";
-import { getRange, supports } from "../excel/office";
-import { defineTool } from "./types";
+import { columnToIndex } from "../../excel/address";
+import { getRange, supports } from "../../excel/office";
+import { defineTool } from "../types";
 
 export const crearNombre = defineTool({
   name: "crear_nombre",

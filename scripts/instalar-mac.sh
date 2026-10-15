@@ -1,5 +1,5 @@
 #!/bin/bash
-# Instala el complemento "Agente Excel" en Excel para Mac (solo para el usuario actual).
+# Instala el complemento "Agente Office" en Excel y Word para Mac (solo para el usuario actual).
 #
 # Uso:
 #   ./scripts/instalar-mac.sh               # producción (GitHub Pages)
@@ -19,16 +19,24 @@ for arg in "$@"; do
   esac
 done
 
-WEF="$HOME/Library/Containers/com.microsoft.Excel/Data/Documents/wef"
+# Cada aplicación lee los manifiestos de su propia carpeta "wef".
+APPS="Excel Word"
+
+for APP in $APPS; do
+  WEF="$HOME/Library/Containers/com.microsoft.$APP/Data/Documents/wef"
+  if [ "$UNINSTALL" = 1 ]; then
+    rm -f "$WEF/$TARGET_NAME"
+  else
+    mkdir -p "$WEF"
+    cp "$MANIFEST" "$WEF/$TARGET_NAME"
+    echo "Listo: $MANIFEST copiado a $WEF"
+  fi
+done
 
 if [ "$UNINSTALL" = 1 ]; then
-  rm -f "$WEF/$TARGET_NAME"
-  echo "Complemento desinstalado ($TARGET_NAME)."
+  echo "Complemento desinstalado de Excel y Word ($TARGET_NAME)."
   exit 0
 fi
 
-mkdir -p "$WEF"
-cp "$MANIFEST" "$WEF/$TARGET_NAME"
-echo "Listo: $MANIFEST copiado a $WEF"
-echo "Cierra Excel (Cmd+Q) y vuelve a abrirlo. Luego: Insertar > Complementos > Mis complementos > Agente Excel."
-echo "Desde ahí queda el botón 'Agente Excel' en la pestaña Inicio."
+echo "Cierra Excel y Word (Cmd+Q) y vuelve a abrirlos. Luego: Insertar > Complementos > Mis complementos > Agente Office."
+echo "Desde ahí queda el botón 'Agente Excel' o 'Agente Word' en la pestaña Inicio."

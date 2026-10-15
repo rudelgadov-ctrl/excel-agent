@@ -2,22 +2,26 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { strToU8, zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import { appendUserContent, prepareAssistantTurn } from "../src/agent/content";
-import { SYSTEM_PROMPT } from "../src/agent/systemPrompt";
-import { API_TOOLS, TOOLS, executeTool } from "../src/tools";
+import { HOSTS } from "../src/agent/hosts";
+import { EXCEL_SYSTEM_PROMPT, WORD_SYSTEM_PROMPT } from "../src/agent/systemPrompt";
+import { EXCEL_TOOLSET, WORD_TOOLSET, type ToolEnv } from "../src/tools";
 import { buildUserContent, classifyFile, docxToText } from "../src/taskpane/attachments";
 import { renderMarkdown } from "../src/taskpane/markdown";
 
 type Block = Anthropic.Beta.Messages.BetaContentBlock;
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 
-const env = { showVba: () => undefined };
+const env: ToolEnv = { showVba: () => undefined, images: () => [] };
 
-describe("herramientas", () => {
+describe.each([
+  ["Excel", EXCEL_TOOLSET],
+  ["Word", WORD_TOOLSET],
+])("herramientas de %s", (_, toolset) => {
   it("genera esquemas de entrada válidos para la API", () => {
-    expect(API_TOOLS).toHaveLength(TOOLS.length);
-    const names = new Set(API_TOOLS.map((t) => t.name));
-    expect(names.size).toBe(API_TOOLS.length);
-    for (const tool of API_TOOLS) {
+    expect(toolset.api).toHaveLength(toolset.tools.length);
+    const names = new Set(toolset.api.map((t) => t.name));
+    expect(names.size).toBe(toolset.api.length);
+    for (const tool of toolset.api) {
       expect(tool.input_schema.type).toBe("object");
       expect(tool.input_schema).not.toHaveProperty("$schema");
       expect(tool.eager_input_streaming).toBe(true);
@@ -25,37 +29,105 @@ describe("herramientas", () => {
     }
   });
 
+  it("los nombres de propiedades son válidos para la API (sin tildes ni ñ)", () => {
+    const keys: string[] = [];
+    const walk = (node: unknown): void => {
+      if (Array.isArray(node)) return node.forEach(walk);
+      if (!node || typeof node !== "object") return;
+      const o = node as Record<string, unknown>;
+      if (o.properties && typeof o.properties === "object") keys.push(...Object.keys(o.properties));
+      Object.values(o).forEach(walk);
+    };
+    for (const tool of toolset.api) {
+      expect(tool.name).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+      walk(tool.input_schema);
+    }
+    expect(keys.length).toBeGreaterThan(0);
+    for (const key of keys) expect(key).toMatch(/^[a-zA-Z0-9_.-]{1,64}$/);
+  });
+
+  it("entregar_vba no requiere aprobación y llama al panel", async () => {
+    const shown: string[] = [];
+    const out = await toolset.execute(
+      "entregar_vba",
+      { nombre_macro: "Totales", codigo: "Sub Totales()\nEnd Sub" },
+      { allowWrites: false, env: { ...env, showVba: (c) => shown.push(c.nombre) } },
+    );
+    expect(out.isError).toBe(false);
+    expect(shown).toEqual(["Totales"]);
+  });
+
+  it("reporta herramientas desconocidas", async () => {
+    const out = await toolset.execute("no_existe", {}, { allowWrites: true, env });
+    expect(out).toEqual({ content: "Herramienta desconocida: no_existe", isError: true });
+  });
+
+  it("solo las herramientas de lectura y entregar_vba funcionan sin aprobación", () => {
+    for (const tool of toolset.tools) {
+      const readOnly = tool.name.startsWith("leer_") || tool.name === "entregar_vba";
+      expect(toolset.isWrite(tool.name), tool.name).toBe(!readOnly);
+    }
+  });
+});
+
+describe("herramientas de Excel", () => {
   it("los campos con valor por defecto son opcionales", () => {
-    const leerRango = API_TOOLS.find((t) => t.name === "leer_rango")!;
+    const leerRango = EXCEL_TOOLSET.api.find((t) => t.name === "leer_rango")!;
     expect(leerRango.input_schema.required).toEqual(["rango"]);
   });
 
   it("bloquea herramientas de escritura sin aprobación", async () => {
-    const out = await executeTool("escribir_rango", { rango: "A1", datos: [[1]] }, { allowWrites: false, env });
+    const out = await EXCEL_TOOLSET.execute("escribir_rango", { rango: "A1", datos: [[1]] }, { allowWrites: false, env });
     expect(out.isError).toBe(true);
     expect(out.content).toMatch(/^BLOQUEADO/);
   });
 
   it("rechaza entradas inválidas con un mensaje útil", async () => {
-    const out = await executeTool("escribir_rango", { rango: "A1" }, { allowWrites: true, env });
+    const out = await EXCEL_TOOLSET.execute("escribir_rango", { rango: "A1" }, { allowWrites: true, env });
     expect(out.isError).toBe(true);
     expect(out.content).toContain("datos");
   });
+});
 
-  it("entregar_vba no requiere aprobación y llama al panel", async () => {
-    const shown: string[] = [];
-    const out = await executeTool(
-      "entregar_vba",
-      { nombre_macro: "Facturar", codigo: "Sub Facturar()\nEnd Sub" },
-      { allowWrites: false, env: { showVba: (c) => shown.push(c.nombre) } },
-    );
-    expect(out.isError).toBe(false);
-    expect(shown).toEqual(["Facturar"]);
+describe("herramientas de Word", () => {
+  it("el objetivo es opcional y sus campos tienen valores por defecto", () => {
+    const insertar = WORD_TOOLSET.api.find((t) => t.name === "insertar_contenido")!;
+    expect(insertar.input_schema.required ?? []).toEqual([]);
+    const formato = WORD_TOOLSET.api.find((t) => t.name === "formato_texto")!;
+    expect(formato.input_schema.required).toEqual(["objetivo"]);
   });
 
-  it("reporta herramientas desconocidas", async () => {
-    const out = await executeTool("no_existe", {}, { allowWrites: true, env });
-    expect(out).toEqual({ content: "Herramienta desconocida: no_existe", isError: true });
+  it("bloquea herramientas de escritura sin aprobación", async () => {
+    const out = await WORD_TOOLSET.execute(
+      "insertar_contenido",
+      { parrafos: [{ texto: "Hola" }] },
+      { allowWrites: false, env },
+    );
+    expect(out.isError).toBe(true);
+    expect(out.content).toMatch(/^BLOQUEADO/);
+  });
+
+  it("exige exactamente un tipo de contenido al insertar", async () => {
+    const out = await WORD_TOOLSET.execute("insertar_contenido", { texto: "a", html: "<p>b</p>" }, { allowWrites: true, env });
+    expect(out).toMatchObject({ isError: true, content: expect.stringContaining("exactamente uno") });
+  });
+
+  it("valida el objetivo antes de tocar el documento", async () => {
+    const out = await WORD_TOOLSET.execute(
+      "formato_texto",
+      { objetivo: { zona: "margen" }, negrita: true },
+      { allowWrites: true, env },
+    );
+    expect(out.isError).toBe(true);
+    expect(out.content).toContain("zona");
+  });
+
+  it("insertar_imagen avisa si no hay imágenes adjuntas", async () => {
+    const out = await WORD_TOOLSET.execute("insertar_imagen", { adjunto: "logo.png" }, { allowWrites: true, env });
+    expect(out).toMatchObject({ isError: true, content: expect.stringContaining("no adjuntó imágenes") });
+    const withImage: ToolEnv = { ...env, images: () => [{ name: "Foto.PNG", data: "", mediaType: "image/webp" }] };
+    const other = await WORD_TOOLSET.execute("insertar_imagen", { adjunto: "otra.png" }, { allowWrites: true, env: withImage });
+    expect(other.content).toContain("«Foto.PNG»");
   });
 });
 
@@ -107,6 +179,13 @@ describe("adjuntos", () => {
     expect(classifyFile("hoja.xlsx", "application/vnd.ms-excel")).toBeNull();
   });
 
+  it("nombra las imágenes adjuntas y usa la solicitud por defecto de la aplicación", () => {
+    const content = buildUserContent("", [{ name: "logo.png", kind: "image", data: "QUJD", mediaType: "image/png", size: 3 }], "documento");
+    expect(content.map((b) => b.type)).toEqual(["text", "image", "text"]);
+    expect(content[0]).toMatchObject({ text: expect.stringContaining("«logo.png»") });
+    expect(content[2]).toMatchObject({ text: expect.stringContaining("este documento") });
+  });
+
   it("pone los adjuntos antes del texto y usa documentos de texto para Word", () => {
     const content = buildUserContent("", [
       { name: "p.pdf", kind: "pdf", data: "QUJD", size: 3 },
@@ -137,17 +216,54 @@ describe("generalidad", () => {
   // herramientas puede depender de las prácticas usadas como referencia.
   const specific = /Amortizaci|Inventario|Facturar|Librer[ií]a|Prec\. por|San Isidro|DN0102|Quiz/i;
 
-  it("el prompt de sistema no menciona prácticas concretas", () => {
-    expect(SYSTEM_PROMPT).not.toMatch(specific);
-    expect(SYSTEM_PROMPT).toMatch(/CUALQUIER práctica/);
+  it.each(Object.values(HOSTS))("el prompt de $app no menciona prácticas concretas", ({ systemPrompt, app }) => {
+    expect(systemPrompt).not.toMatch(specific);
+    expect(systemPrompt).toMatch(/CUALQUIER práctica/);
+    expect(systemPrompt).toContain(`Agente ${app}`);
+    expect(systemPrompt).toContain("[Estado: esperando aprobación]");
   });
 
-  it("las herramientas no mencionan prácticas concretas", () => {
-    expect(JSON.stringify(API_TOOLS)).not.toMatch(specific);
+  it.each(Object.values(HOSTS))("las herramientas de $app no mencionan prácticas concretas", ({ toolset }) => {
+    expect(JSON.stringify(toolset.api)).not.toMatch(specific);
+  });
+
+  it("cada prompt menciona todas sus herramientas y ninguna de la otra aplicación", () => {
+    for (const host of Object.values(HOSTS)) {
+      const own = new Set(host.toolset.tools.map((t) => t.name));
+      for (const name of own) expect(host.systemPrompt, `${host.app}: ${name}`).toContain(name);
+      const other = Object.values(HOSTS).find((h) => h !== host)!;
+      for (const t of other.toolset.tools) {
+        if (!own.has(t.name)) expect(host.systemPrompt, `${host.app}: ${t.name}`).not.toContain(t.name);
+      }
+    }
+    expect(EXCEL_SYSTEM_PROMPT).not.toBe(WORD_SYSTEM_PROMPT);
+  });
+
+  it("cubre los temas habituales de un curso de Word", () => {
+    const names = WORD_TOOLSET.api.map((t) => t.name);
+    for (const name of [
+      "leer_documento",
+      "insertar_contenido",
+      "formato_texto",
+      "formato_parrafo",
+      "aplicar_lista",
+      "modificar_estilo",
+      "insertar_tabla",
+      "editar_tabla",
+      "formato_tabla",
+      "configurar_pagina",
+      "insertar_salto",
+      "insertar_campo",
+      "insertar_vinculo_o_nota",
+      "insertar_imagen",
+      "entregar_vba",
+    ]) {
+      expect(names).toContain(name);
+    }
   });
 
   it("cubre los temas habituales de un curso de Excel", () => {
-    const names = API_TOOLS.map((t) => t.name);
+    const names = EXCEL_TOOLSET.api.map((t) => t.name);
     for (const name of [
       "formato_condicional",
       "tabla_dinamica",

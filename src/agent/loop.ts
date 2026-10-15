@@ -1,8 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { API_TOOLS, executeTool, type ToolEnv } from "../tools";
+import type { ToolEnv } from "../tools";
 import { appendUserContent, prepareAssistantTurn } from "./content";
+import type { HostProfile } from "./hosts";
 import { modelInfo, type ModelInfo, type Settings } from "./settings";
-import { STATUS, SYSTEM_PROMPT } from "./systemPrompt";
+import { STATUS } from "./systemPrompt";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type ContentBlockParam = Anthropic.Beta.Messages.BetaContentBlockParam;
@@ -45,13 +46,16 @@ const emptyUsage = (): UsageTotals => ({
   costUsd: 0,
 });
 
-export class ExcelAgent {
+export class OfficeAgent {
   private messages: MessageParam[] = [];
   private controller: AbortController | null = null;
   approved = false;
   usage: UsageTotals = emptyUsage();
 
-  constructor(private readonly env: ToolEnv) {}
+  constructor(
+    readonly host: HostProfile,
+    private readonly env: ToolEnv,
+  ) {}
 
   get busy(): boolean {
     return this.controller !== null;
@@ -94,8 +98,8 @@ export class ExcelAgent {
           {
             model: model.id,
             max_tokens: 64_000,
-            system: SYSTEM_PROMPT,
-            tools: API_TOOLS,
+            system: this.host.systemPrompt,
+            tools: this.host.toolset.api,
             messages: this.messages,
             thinking: { type: "adaptive", display: "updates" },
             output_config: { effort: settings.effort },
@@ -150,7 +154,7 @@ export class ExcelAgent {
             continue;
           }
           events.onToolStart(toolUse.id, toolUse.name, toolUse.input);
-          const out = await executeTool(toolUse.name, toolUse.input, { allowWrites, env: this.env });
+          const out = await this.host.toolset.execute(toolUse.name, toolUse.input, { allowWrites, env: this.env });
           events.onToolEnd(toolUse.id, !out.isError, out.content);
           results.push({
             type: "tool_result",
