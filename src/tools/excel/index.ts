@@ -11,8 +11,11 @@ import {
   tablaDinamica,
 } from "./advanced";
 import { crearGrafico } from "./chart";
+import { gestionarFormas, segmentacion } from "./dashboard";
+import { limpiarDatos, modificarTabla } from "./data";
 import { formatearRango } from "./format";
 import { ejecutarOfficeJs } from "./misc";
+import { macroModeloDatos } from "./model";
 import { leerLibro, leerRango } from "./read";
 import { crearNombre, gestionarHojas, ordenar, validacionDatos } from "./structure";
 import { copiarRango, dividirTexto, escribirRango, rellenarSerie } from "./write";
@@ -32,12 +35,17 @@ export const EXCEL_TOOLSET = createToolset(
     ordenar,
     insertarEliminar,
     quitarDuplicados,
+    limpiarDatos,
     formatoCondicional,
     crearTabla,
+    modificarTabla,
     tablaDinamica,
+    segmentacion,
     filtrar,
     configurarHoja,
     crearGrafico,
+    gestionarFormas,
+    macroModeloDatos,
     entregarVba,
     ejecutarOfficeJs,
   ],

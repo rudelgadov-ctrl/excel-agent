@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { columnToIndex } from "../../excel/address";
 import { getRange, getSheet, supports } from "../../excel/office";
+import { MOSTRAR_COMO, MOSTRAR_COMO_KEYS } from "../../excel/pivot";
 import { defineTool } from "../types";
 
 function requireApi(minor: number, feature: string): void {
@@ -239,11 +240,23 @@ const Aggregation = z.enum([
   "VarianceP",
 ]);
 
+const TOP_TIPOS = {
+  superiores: { condition: "TopN", selection: "Items" },
+  inferiores: { condition: "BottomN", selection: "Items" },
+  porcentaje_superior: { condition: "TopN", selection: "Percent" },
+  porcentaje_inferior: { condition: "BottomN", selection: "Percent" },
+  suma_superior: { condition: "TopN", selection: "Sum" },
+  suma_inferior: { condition: "BottomN", selection: "Sum" },
+} as const;
+
 export const tablaDinamica = defineTool({
   name: "tabla_dinamica",
   description:
-    "Crea una tabla dinámica. Los campos se indican por el texto exacto de su encabezado en el origen. " +
-    "El destino puede estar en otra hoja (créala antes con gestionar_hojas si no existe).",
+    "Crea una tabla dinámica desde una tabla de Excel o un rango (los campos van por el texto exacto del encabezado). " +
+    "Incluye mostrar valores como (% del total general, de la fila, acumulado, clasificación…), subtotales arriba/abajo, " +
+    "totales generales, filtro Top N, filtrar elementos y ordenar. El destino puede estar en otra hoja (créala antes " +
+    "con gestionar_hojas). Varias en la misma hoja: déjales espacio, porque crecen al filtrar. Para el modelo de datos " +
+    "(campos de varias tablas relacionadas), agrupar fechas, estilos o recuento distinto usa macro_modelo_datos.",
   schema: z.object({
     nombre: z.string().describe("Nombre de la tabla dinámica, sin espacios."),
     origen: z.string().describe("Rango de datos con encabezados, o nombre de una tabla de Excel."),
@@ -255,38 +268,135 @@ export const tablaDinamica = defineTool({
         z.object({
           campo: z.string(),
           resumen: Aggregation.default("Sum"),
-          nombre: z.string().optional().describe("Título del campo de valores."),
+          nombre: z.string().optional().describe("Título del campo de valores (no puede ser igual a un encabezado)."),
           formato_numero: z.string().optional(),
+          mostrar_como: z.enum(MOSTRAR_COMO_KEYS).optional(),
+          campo_base: z.string().optional().describe("Para total acumulado y clasificar (por defecto, el primer campo de filas)."),
         }),
       )
       .default([]),
     filtros: z.array(z.string()).default([]),
     diseno: z.enum(["Compact", "Tabular", "Outline"]).optional(),
+    subtotales: z.enum(["arriba", "abajo", "ninguno"]).optional(),
+    total_general_abajo: z.boolean().optional().describe("Fila «Total general» al pie."),
+    total_general_derecha: z.boolean().optional().describe("Columna «Total general» a la derecha."),
+    top: z
+      .object({
+        campo: z.string().describe("Campo de filas o columnas."),
+        cantidad: z.number().positive(),
+        tipo: z.enum(Object.keys(TOP_TIPOS) as [keyof typeof TOP_TIPOS]).default("superiores"),
+        valor: z.string().optional().describe("Título del valor por el que se clasifica (por defecto el primero)."),
+      })
+      .optional(),
+    filtrar_elementos: z
+      .array(z.object({ campo: z.string(), elementos: z.array(z.string()).min(1).describe("Elementos que quedan visibles.") }))
+      .optional(),
+    ordenar: z
+      .array(
+        z.object({
+          campo: z.string(),
+          descendente: z.boolean().default(true),
+          por_valor: z.string().optional().describe("Título del valor; sin él ordena por etiqueta."),
+        }),
+      )
+      .optional(),
+    reemplazar: z.boolean().default(false).describe("Si ya existe una tabla dinámica con ese nombre, la borra antes."),
   }),
   writes: true,
   async run(input) {
     requireApi(8, "Las tablas dinámicas");
     return Excel.run(async (context) => {
+      const avisos: string[] = [];
+      if (input.reemplazar) {
+        const old = context.workbook.pivotTables.getItemOrNullObject(input.nombre);
+        await context.sync();
+        if (!old.isNullObject) {
+          old.delete();
+          await context.sync();
+        }
+      }
       const dest = getRange(context, input.destino);
       const table = context.workbook.tables.getItemOrNullObject(input.origen);
       await context.sync();
       const source: Excel.Range | Excel.Table = table.isNullObject ? getRange(context, input.origen) : table;
       const pivot = dest.worksheet.pivotTables.add(input.nombre, source, dest);
+      const fieldOf = (name: string) => pivot.hierarchies.getItem(name).fields.getItem(name);
       for (const f of input.filas) pivot.rowHierarchies.add(pivot.hierarchies.getItem(f));
       for (const f of input.columnas) pivot.columnHierarchies.add(pivot.hierarchies.getItem(f));
+      const data: Excel.DataPivotHierarchy[] = [];
       for (const v of input.valores) {
         const dh = pivot.dataHierarchies.add(pivot.hierarchies.getItem(v.campo));
         dh.summarizeBy = v.resumen;
         if (v.nombre) dh.name = v.nombre;
         if (v.formato_numero) dh.numberFormat = v.formato_numero;
+        if (v.mostrar_como && v.mostrar_como !== "sin_calculo") {
+          const rule = MOSTRAR_COMO[v.mostrar_como];
+          const base = v.campo_base ?? input.filas[0] ?? input.columnas[0];
+          if (rule.base && !base) throw new Error(`"${v.mostrar_como}" necesita campo_base o un campo en filas.`);
+          dh.showAs = {
+            calculation: rule.officeJs as Excel.ShowAsCalculation,
+            ...(rule.base ? { baseField: fieldOf(base!) } : {}),
+          };
+        }
+        data.push(dh);
       }
       for (const f of input.filtros) pivot.filterHierarchies.add(pivot.hierarchies.getItem(f));
       if (input.diseno) pivot.layout.layoutType = input.diseno;
+      if (input.subtotales) pivot.layout.subtotalLocation = { arriba: "AtTop", abajo: "AtBottom", ninguno: "Off" }[input.subtotales] as Excel.SubtotalLocationType;
+      if (input.total_general_abajo !== undefined) pivot.layout.showColumnGrandTotals = input.total_general_abajo;
+      if (input.total_general_derecha !== undefined) pivot.layout.showRowGrandTotals = input.total_general_derecha;
+      await context.sync();
+      data.forEach((dh) => dh.load("name"));
+      await context.sync();
+      const valueNames = data.map((dh) => dh.name);
+      const valueByName = (name: string | undefined, what: string) => {
+        if (!data.length) throw new Error(`${what} necesita al menos un campo de valores.`);
+        if (!name) return data[0];
+        const i = valueNames.findIndex((n) => n.toLowerCase() === name.toLowerCase());
+        if (i < 0) throw new Error(`${what}: no hay un valor "${name}". Valores: ${valueNames.join(", ")}.`);
+        return data[i];
+      };
+
+      if (input.top || input.filtrar_elementos?.length) {
+        if (!supports(12)) {
+          avisos.push("Los filtros de tabla dinámica requieren ExcelApi 1.12: usa macro_modelo_datos (top) o filtra a mano.");
+        } else {
+          if (input.top) {
+            const t = TOP_TIPOS[input.top.tipo];
+            const dh = valueByName(input.top.valor, "El filtro top");
+            fieldOf(input.top.campo).applyFilter({
+              valueFilter: {
+                condition: t.condition as Excel.ValueFilterCondition,
+                comparator: input.top.cantidad,
+                value: dh.name,
+                selectionType: t.selection as Excel.TopBottomSelectionType,
+              },
+            });
+          }
+          for (const f of input.filtrar_elementos ?? []) {
+            fieldOf(f.campo).applyFilter({ manualFilter: { selectedItems: f.elementos } });
+          }
+        }
+      }
+      for (const o of input.ordenar ?? []) {
+        const order = o.descendente ? Excel.SortBy.descending : Excel.SortBy.ascending;
+        if (o.por_valor) {
+          if (!supports(9)) avisos.push("Ordenar por valor requiere ExcelApi 1.9.");
+          else fieldOf(o.campo).sortByValues(order, valueByName(o.por_valor, "Ordenar"));
+        } else {
+          fieldOf(o.campo).sortByLabels(order);
+        }
+      }
       await context.sync();
       const area = pivot.layout.getRange();
       area.load("address");
       await context.sync();
-      return { tabla_dinamica: input.nombre, rango: area.address };
+      return {
+        tabla_dinamica: input.nombre,
+        rango: area.address,
+        valores: valueNames,
+        avisos: avisos.length ? avisos : undefined,
+      };
     });
   },
 });

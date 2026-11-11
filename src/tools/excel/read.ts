@@ -11,10 +11,11 @@ function isEmpty(v: unknown): boolean {
 export const leerLibro = defineTool({
   name: "leer_libro",
   description:
-    "Resumen del libro abierto: hojas (con su rango usado, celdas combinadas, gráficos, tablas, tablas " +
-    "dinámicas y texto de cuadros de texto), nombres definidos, hoja activa, versión de ExcelApi soportada y " +
-    "una vista previa de las celdas no vacías de cada hoja (fórmulas incluidas). Úsala siempre al empezar: " +
-    "a veces las instrucciones vienen dentro del propio libro.",
+    "Resumen del libro abierto: hojas (con su rango usado, celdas combinadas, gráficos, tablas con sus encabezados " +
+    "exactos, tablas dinámicas con sus campos, segmentadores y formas con su texto, también dentro de grupos), " +
+    "nombres definidos, hoja activa, versión de ExcelApi soportada y una vista previa de las celdas no vacías de cada " +
+    "hoja (fórmulas incluidas). Úsala siempre al empezar (a veces las instrucciones vienen dentro del propio libro) " +
+    "y para verificar al terminar.",
   schema: z.object({
     max_celdas_por_hoja: z
       .number()
@@ -84,18 +85,23 @@ export const leerLibro = defineTool({
           rango_usado: used.isNullObject ? null : used.address.split("!").pop(),
           celdas_combinadas: combinadas,
           graficos: charts.items.map((c) => ({ nombre: c.name, tipo: supports(7) ? c.chartType : undefined })),
-          tablas: tables.items.map((t) => t.name),
+          tablas: tables.items.map((t) => t.name) as unknown[],
           celdas_no_vacias: total,
           vista_previa: celdas,
           vista_previa_recortada: total > Object.keys(celdas).length,
         };
       });
 
-      const textos = await readShapeTexts(context, perSheet.map((p) => p.ws));
-      const dinamicas = await readPivotNames(context, perSheet.map((p) => p.ws));
+      const tablas = await readTables(context, perSheet.map((p) => p.tables));
+      const formas = await readShapes(context, perSheet.map((p) => p.ws));
+      const dinamicas = await readPivots(context, perSheet.map((p) => p.ws));
+      const segmentadores = await readSlicers(context);
       hojas.forEach((h, i) => {
-        if (textos[i]?.length) Object.assign(h, { cuadros_de_texto: textos[i] });
+        if (tablas[i]?.length) h.tablas = tablas[i];
+        if (formas[i]?.length) Object.assign(h, { formas: formas[i] });
         if (dinamicas[i]?.length) Object.assign(h, { tablas_dinamicas: dinamicas[i] });
+        const sl = segmentadores.filter((s) => s.hoja === h.nombre).map(({ hoja: _, ...rest }) => rest);
+        if (sl.length) Object.assign(h, { segmentadores: sl });
       });
 
       return {
@@ -108,43 +114,97 @@ export const leerLibro = defineTool({
   },
 });
 
-/**
- * Texto de las formas (cuadros de texto) de cada hoja: algunas plantillas traen ahí las
- * instrucciones. Es información opcional, así que cualquier fallo se ignora.
- */
-async function readShapeTexts(
+/** Tablas de Excel con su rango y encabezados (para usar los nombres exactos en tablas dinámicas y relaciones). */
+async function readTables(
   context: Excel.RequestContext,
-  sheets: Excel.Worksheet[],
-): Promise<{ nombre: string; texto: string }[][]> {
-  if (!supports(9)) return [];
+  collections: Excel.TableCollection[],
+): Promise<{ nombre: string; rango: string; encabezados: Cell[] }[][]> {
   try {
-    const shapes = sheets.map((ws) => {
-      const s = ws.shapes;
-      s.load("items/name,items/type");
-      return s;
-    });
-    await context.sync();
-    const withFrame = shapes.map((s) =>
-      s.items
-        .filter((shape) => shape.type === Excel.ShapeType.geometricShape)
-        .map((shape) => {
-          shape.textFrame.load("hasText");
-          shape.textFrame.textRange.load("text");
-          return shape;
-        }),
+    const parts = collections.map((c) =>
+      c.items.map((t) => {
+        const range = t.getRange();
+        range.load("address");
+        const header = t.getHeaderRowRange();
+        header.load("values");
+        return { t, range, header };
+      }),
     );
     await context.sync();
-    return withFrame.map((list) =>
-      list
-        .filter((shape) => shape.textFrame.hasText)
-        .map((shape) => ({ nombre: shape.name, texto: shape.textFrame.textRange.text.slice(0, 4000) })),
+    return parts.map((list) =>
+      list.map(({ t, range, header }) => ({
+        nombre: t.name,
+        rango: range.address.split("!").pop() ?? range.address,
+        encabezados: header.values[0] as Cell[],
+      })),
     );
   } catch {
     return [];
   }
 }
 
-async function readPivotNames(context: Excel.RequestContext, sheets: Excel.Worksheet[]): Promise<string[][]> {
+interface ShapeInfo {
+  nombre: string;
+  tipo: string;
+  texto?: string;
+  formas?: string[];
+  posicion?: string;
+}
+
+/**
+ * Formas de cada hoja con su texto (algunas plantillas traen ahí las instrucciones; en un dashboard son los
+ * indicadores) y las formas de cada grupo. Es información opcional, así que cualquier fallo se ignora.
+ */
+async function readShapes(context: Excel.RequestContext, sheets: Excel.Worksheet[]): Promise<ShapeInfo[][]> {
+  if (!supports(9)) return [];
+  try {
+    const shapes = sheets.map((ws) => {
+      const s = ws.shapes;
+      s.load("items/name,items/type,items/left,items/top,items/width,items/height");
+      return s;
+    });
+    await context.sync();
+    const details = shapes.map((s) =>
+      s.items.map((shape) => {
+        if (shape.type === Excel.ShapeType.geometricShape) {
+          shape.textFrame.load("hasText");
+          shape.textFrame.textRange.load("text");
+        }
+        const inner = shape.type === Excel.ShapeType.group ? shape.group.shapes : null;
+        inner?.load("items/name");
+        return { shape, inner };
+      }),
+    );
+    await context.sync();
+    return details.map((list) =>
+      list.map(({ shape, inner }) => {
+        const info: ShapeInfo = {
+          nombre: shape.name,
+          tipo: shape.type,
+          posicion: `izq ${Math.round(shape.left)}, arriba ${Math.round(shape.top)}, ${Math.round(shape.width)}x${Math.round(shape.height)} pt`,
+        };
+        if (shape.type === Excel.ShapeType.geometricShape && shape.textFrame.hasText) {
+          info.texto = shape.textFrame.textRange.text.slice(0, 4000);
+        }
+        if (inner) info.formas = inner.items.map((x) => x.name);
+        return info;
+      }),
+    );
+  } catch {
+    return [];
+  }
+}
+
+interface PivotInfo {
+  nombre: string;
+  rango?: string;
+  filas?: string[];
+  columnas?: string[];
+  valores?: string[];
+  filtros?: string[];
+}
+
+/** Tablas dinámicas con su rango y campos (las del modelo de datos pueden mostrarse solo con el nombre). */
+async function readPivots(context: Excel.RequestContext, sheets: Excel.Worksheet[]): Promise<PivotInfo[][]> {
   if (!supports(8)) return [];
   try {
     const pivots = sheets.map((ws) => {
@@ -153,7 +213,46 @@ async function readPivotNames(context: Excel.RequestContext, sheets: Excel.Works
       return p;
     });
     await context.sync();
-    return pivots.map((p) => p.items.map((pt) => pt.name));
+    const result: PivotInfo[][] = pivots.map((p) => p.items.map((pt) => ({ nombre: pt.name })));
+    for (const [i, p] of pivots.entries()) {
+      for (const [j, pt] of p.items.entries()) {
+        try {
+          const range = pt.layout.getRange();
+          range.load("address");
+          const axes = [pt.rowHierarchies, pt.columnHierarchies, pt.dataHierarchies, pt.filterHierarchies];
+          axes.forEach((a) => a.load("items/name"));
+          await context.sync();
+          const [filas, columnas, valores, filtros] = axes.map((a) => a.items.map((h) => h.name));
+          result[i][j] = { nombre: pt.name, rango: range.address.split("!").pop(), filas, columnas, valores, filtros };
+        } catch {
+          // Office.js no describe algunas tablas dinámicas (p. ej. del modelo de datos): queda solo el nombre.
+        }
+      }
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+async function readSlicers(context: Excel.RequestContext): Promise<{ hoja: string; nombre: string; titulo: string; seleccion?: string[] }[]> {
+  if (!supports(10)) return [];
+  try {
+    const slicers = context.workbook.slicers;
+    slicers.load("items/name,items/caption,items/isFilterCleared");
+    await context.sync();
+    const extra = slicers.items.map((s) => {
+      s.worksheet.load("name");
+      const selected = s.isFilterCleared ? null : s.getSelectedItems();
+      return { s, selected };
+    });
+    await context.sync();
+    return extra.map(({ s, selected }) => ({
+      hoja: s.worksheet.name,
+      nombre: s.name,
+      titulo: s.caption,
+      seleccion: selected ? selected.value : undefined,
+    }));
   } catch {
     return [];
   }

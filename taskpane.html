@@ -38,6 +38,11 @@
           </small>
         </label>
         <label class="field">
+          <span>Workspace ID (opcional)</span>
+          <input id="set-workspace" type="text" autocomplete="off" spellcheck="false" placeholder="wrkspc_…" />
+          <small>Solo si tu key empieza con sk-ant-usr- y la API pide el workspace. Está en Console &gt; Settings &gt; Workspaces.</small>
+        </label>
+        <label class="field">
           <span>Modelo</span>
           <select id="set-model"></select>
         </label>
@@ -61,7 +66,7 @@
           <p id="empty-scope">Sirve para cualquier práctica, tarea o requerimiento de Excel o Word.</p>
           <ol>
             <li id="empty-open">Abre la plantilla en Excel o en Word.</li>
-            <li>Pega las instrucciones o adjunta el archivo (PDF, Word, texto o imagen). Si ya vienen dentro del archivo, solo pídele que las resuelva.</li>
+            <li>Pega las instrucciones o adjunta el archivo (PDF, Word, Excel, texto o imagen; también los archivos de datos que haya que importar). Si ya vienen dentro del archivo, solo pídele que las resuelva.</li>
             <li>Revisa el plan y presiona <strong>Aprobar y ejecutar</strong>.</li>
           </ol>
           <p class="muted">
@@ -84,7 +89,7 @@
           placeholder="Pega aquí las instrucciones (Ctrl+Enter para enviar)…"
         ></textarea>
         <div class="row">
-          <label class="ghost small attach" title="Adjuntar PDF, Word, texto o imagen con las instrucciones">
+          <label class="ghost small attach" title="Adjuntar PDF, Word, Excel, texto o imagen con las instrucciones o los datos">
             <input id="file" type="file" multiple hidden />
             Adjuntar archivo
           </label>

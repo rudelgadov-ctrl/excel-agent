@@ -4,6 +4,8 @@ export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface Settings {
   apiKey: string;
+  /** Opcional: solo para API keys de usuario (sk-ant-usr-…) que no están atadas a un workspace. */
+  workspaceId: string;
   model: string;
   effort: Effort;
   /** Ejecuta sin pedir aprobación del plan. */
@@ -38,6 +40,7 @@ export const EFFORTS: { id: Effort; label: string }[] = [
 
 export const DEFAULT_SETTINGS: Settings = {
   apiKey: "",
+  workspaceId: "",
   model: "claude-opus-5-5",
   effort: "high",
   autoMode: false,

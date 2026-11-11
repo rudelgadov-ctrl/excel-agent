@@ -90,17 +90,21 @@ En **Ajustes** puedes activar el **modo automático** (ejecuta sin pedir aprobac
 
 | Herramienta | Para qué |
 |---|---|
-| `leer_libro`, `leer_rango` | Inspeccionar hojas, celdas, fórmulas, formatos, tablas, cuadros de texto |
+| `leer_libro`, `leer_rango` | Inspeccionar hojas, celdas, fórmulas, formatos, tablas y encabezados, tablas dinámicas, segmentadores, formas |
 | `escribir_rango` | Valores y fórmulas de cualquier tipo (detecta celdas con error) |
 | `rellenar_serie` | Relleno automático (series, fechas, copiar fórmulas) |
 | `copiar_rango`, `dividir_texto` | Copiar y pegado especial (también entre hojas); texto en columnas |
 | `insertar_eliminar`, `quitar_duplicados` | Filas, columnas y celdas; duplicados |
+| `limpiar_datos` | Depurar: espacios sobrantes, no imprimibles, mayúsculas, números y fechas guardados como texto |
 | `ordenar`, `filtrar` | Ordenar por varias columnas; autofiltro (valores, criterios, top N) |
-| `crear_nombre`, `validacion_datos` | Rangos con nombre; listas desplegables, números, fechas, fórmulas |
+| `crear_nombre`, `validacion_datos` | Crear o eliminar nombres definidos; listas desplegables, números, fechas, fórmulas |
 | `formatear_rango` | Moneda, fechas, %, alineación, fuente, relleno, bordes, combinar, anchos |
 | `formato_condicional` | Reglas, texto, top/bottom, fórmulas, duplicados, escalas, barras, íconos |
-| `crear_tabla`, `tabla_dinamica` | Dar formato como tabla; tablas dinámicas con filas, columnas, valores y filtros |
-| `crear_grafico` | Columnas, barras, líneas, circular, anillo, área, dispersión, radial, 3D, histograma… |
+| `crear_tabla`, `modificar_tabla` | Dar formato como tabla; renombrar, columnas calculadas, estilo, totales |
+| `tabla_dinamica` | Tablas dinámicas: mostrar valores como (% del total…), subtotales, totales, top N, filtros, ordenar |
+| `segmentacion`, `gestionar_formas` | Segmentadores; formas e indicadores (KPI) con relleno, texto y fuente, agrupar |
+| `crear_grafico` | Columnas, barras, líneas, circular, anillo, área, dispersión, radial, 3D…; de tablas dinámicas, con etiquetas |
+| `macro_modelo_datos` | Macro VBA probada para el modelo de datos (Power Pivot), relaciones, tablas dinámicas del modelo, agrupar fechas, segmentadores conectados, gráficos dinámicos y formas vinculadas a celdas |
 | `gestionar_hojas`, `configurar_hoja` | Crear/copiar/renombrar hojas; inmovilizar, pestaña, proteger, impresión |
 | `entregar_vba` | Código de macros listo para pegar |
 | `ejecutar_office_js` | Cualquier otra cosa que permita la API de Excel (hipervínculos, comentarios, imágenes…) |
@@ -136,6 +140,11 @@ alternativa y lo indica en el plan y en el resumen.
 - **Excel: Buscar objetivo, Solver, escenarios**: calcula la solución con fórmulas, escribe el resultado y
   entrega el VBA o los pasos manuales si la práctica exige usar la herramienta.
 - **Excel: tablas de datos (análisis Y si)**: las reproduce con fórmulas equivalentes y explica cómo crear la original.
+- **Excel: modelo de datos (Power Pivot), relaciones y lo que depende de ellos** (tablas dinámicas con campos
+  de varias tablas, agrupar fechas, segmentadores conectados a varias tablas dinámicas o con columnas, escalas
+  de tiempo, gráficos dinámicos, vincular el texto de una forma a una celda): el agente prepara todo lo demás
+  con la API y genera una macro (`macro_modelo_datos`) que se ejecuta una vez y muestra un resumen por paso.
+  Solo funciona en Excel para Windows: Power Pivot no existe en Mac.
 - **Excel: minigráficos, Power Query, guardar como otro formato, imprimir**: pasos manuales precisos.
 - **Word: combinación de correspondencia**: inserta los campos MERGEFIELD, prepara la lista de datos y da los
   pasos para conectar los destinatarios y combinar.

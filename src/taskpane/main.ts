@@ -32,6 +32,7 @@ const ui = {
   hostWarning: $("host-warning"),
   settings: $("settings"),
   setKey: $<HTMLInputElement>("set-key"),
+  setWorkspace: $<HTMLInputElement>("set-workspace"),
   setModel: $<HTMLSelectElement>("set-model"),
   setEffort: $<HTMLSelectElement>("set-effort"),
   setAuto: $<HTMLInputElement>("set-auto"),
@@ -355,7 +356,12 @@ function vbaCard(card: VbaCard, host: HostKind): HTMLElement {
     return wrap;
   };
   const fill = (items: string[]) => items.map((item) => item.replace("{macro}", card.nombre));
-  steps.append(list("Windows", fill(VBA_STEPS[host].windows)), list("Mac", fill(VBA_STEPS[host].mac)));
+  if (card.soloWindows) {
+    steps.append(list("Windows", fill(VBA_STEPS[host].windows)));
+    steps.append(el("p", "muted", "En Mac no se puede: el modelo de datos (Power Pivot) solo existe en Excel para Windows."));
+  } else {
+    steps.append(list("Windows", fill(VBA_STEPS[host].windows)), list("Mac", fill(VBA_STEPS[host].mac)));
+  }
   box.append(steps);
   if (card.comoEjecutar) box.append(el("p", "muted", card.comoEjecutar));
   return box;
@@ -555,6 +561,7 @@ function openSettings(open = ui.settings.hidden): void {
   ui.settings.hidden = !open;
   if (open) {
     ui.setKey.value = settings.apiKey;
+    ui.setWorkspace.value = settings.workspaceId;
     ui.setModel.value = settings.model;
     ui.setEffort.value = settings.effort;
     ui.setAuto.checked = settings.autoMode;
@@ -565,6 +572,7 @@ function openSettings(open = ui.settings.hidden): void {
 function onSaveSettings(): void {
   settings = {
     apiKey: ui.setKey.value.trim(),
+    workspaceId: ui.setWorkspace.value.trim(),
     model: ui.setModel.value,
     effort: ui.setEffort.value as Effort,
     autoMode: ui.setAuto.checked,

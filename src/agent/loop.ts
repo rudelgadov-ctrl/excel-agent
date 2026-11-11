@@ -88,7 +88,12 @@ export class OfficeAgent {
 
     const controller = new AbortController();
     this.controller = controller;
-    const client = new Anthropic({ apiKey: settings.apiKey, dangerouslyAllowBrowser: true, maxRetries: 3 });
+    const client = new Anthropic({
+      apiKey: settings.apiKey,
+      dangerouslyAllowBrowser: true,
+      maxRetries: 3,
+      ...(settings.workspaceId.trim() ? { defaultHeaders: { "anthropic-workspace-id": settings.workspaceId.trim() } } : {}),
+    });
     const model = modelInfo(settings.model);
 
     try {

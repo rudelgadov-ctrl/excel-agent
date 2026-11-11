@@ -7,17 +7,28 @@ export const crearNombre = defineTool({
   name: "crear_nombre",
   description:
     "Asigna un nombre definido (alcance de libro) a un rango para usarlo en fórmulas (=PMT(Tasa/12,Plazo,-Monto)). " +
-    "Si el nombre ya existe, lo reemplaza. Nombres sin espacios ni acentos raros, que no parezcan una celda (no \"A1\").",
+    "Si el nombre ya existe, lo reemplaza. Nombres sin espacios ni acentos raros, que no parezcan una celda (no \"A1\"). " +
+    "accion=eliminar borra un nombre definido.",
   schema: z.object({
+    accion: z.enum(["crear", "eliminar"]).default("crear"),
     nombre: z.string().regex(/^[A-Za-z_À-ſ][\w.À-ſ]*$/, "Nombre inválido para Excel"),
-    rango: z.string(),
+    rango: z.string().optional().describe("Obligatorio al crear."),
     comentario: z.string().optional(),
   }),
   writes: true,
-  async run({ nombre, rango, comentario }) {
+  async run({ accion, nombre, rango, comentario }) {
     return Excel.run(async (context) => {
       const existing = context.workbook.names.getItemOrNullObject(nombre);
+      existing.load("value");
       await context.sync();
+      if (accion === "eliminar") {
+        if (existing.isNullObject) throw new Error(`No existe el nombre definido "${nombre}".`);
+        const value = existing.value;
+        existing.delete();
+        await context.sync();
+        return { eliminado: nombre, apuntaba_a: value };
+      }
+      if (!rango) throw new Error("Falta el rango.");
       if (!existing.isNullObject) existing.delete();
       const item = context.workbook.names.add(nombre, getRange(context, rango), comentario);
       item.load("name,value");

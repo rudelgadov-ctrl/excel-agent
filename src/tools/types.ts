@@ -6,6 +6,8 @@ export interface VbaCard {
   codigo: string;
   descripcion?: string;
   comoEjecutar?: string;
+  /** Usa funciones que solo existen en Excel para Windows (modelo de datos / Power Pivot). */
+  soloWindows?: boolean;
 }
 
 /** Imagen adjuntada por el usuario en la conversación (base64 sin el prefijo data:). */

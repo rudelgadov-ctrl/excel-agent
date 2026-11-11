@@ -15,9 +15,9 @@ nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de tra
   herramienta menciona una.
 - Cuando una práctica nueva falle, corregir la capacidad general que faltó (una herramienta, una regla
   del prompt), no el caso particular.
-- Lo que la API de Office.js no permite (macros, Buscar objetivo, Solver, tablas de datos, minigráficos;
-  en Word combinación de correspondencia, SmartArt, marca de agua…) se resuelve con alternativa + VBA o
-  pasos manuales; nunca se omite en silencio.
+- Lo que la API de Office.js no permite (macros, Buscar objetivo, Solver, tablas de datos, minigráficos,
+  modelo de datos/Power Pivot y relaciones; en Word combinación de correspondencia, SmartArt, marca de agua…)
+  se resuelve con alternativa + VBA o pasos manuales; nunca se omite en silencio.
 
 ## Comandos
 
@@ -40,8 +40,8 @@ nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de tra
 - `systemPrompt.ts`: `EXCEL_SYSTEM_PROMPT` y `WORD_SYSTEM_PROMPT` comparten los pasos de aprobación,
   cierre y estilo. Cada prompt debe nombrar todas sus herramientas y ninguna de la otra aplicación (lo prueba
   `tests/agent.test.ts`).
-- Adjuntos (`src/taskpane/attachments.ts`): PDF e imágenes van en base64; Word (.docx, con fflate) y
-  texto se envían como documentos de texto. Cada imagen va precedida de su nombre y el panel la guarda en
+- Adjuntos (`src/taskpane/attachments.ts`): PDF e imágenes van en base64; Word (.docx, con fflate), Excel
+  (.xlsx, valores por hoja con fechas ISO) y texto (UTF-8, UTF-16 o Windows-1252) se envían como documentos de texto. Cada imagen va precedida de su nombre y el panel la guarda en
   la sesión (`ToolEnv.images()`) para que `insertar_imagen` (Word) pueda insertarla.
 - `src/tools/`: cada herramienta es `defineTool({ name, description, schema (zod), writes, run })`.
   `createToolset` (`tools/toolset.ts`) arma el JSON Schema para la API con `z.toJSONSchema(..., { io: "input" })`,
@@ -50,7 +50,18 @@ nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de tra
 - Herramientas de Word: casi todas reciben `objetivo` (`tools/word/common.ts`: zona cuerpo/encabezado/pie,
   párrafos por número de `leer_documento`, tabla, texto buscado, selección), que `resolveTarget`
   (`src/word/office.ts`) convierte en rangos. Las unidades son cm (sangrías, márgenes) y puntos (fuente, espaciado).
-- `src/excel/`: helpers puros testeables (`address`, `series`, `text`) y helpers Office.js (`office.ts`).
+- `src/excel/`: helpers puros testeables (`address`, `series`, `text`, `clean` para limpiar_datos, `pivot` con
+  las definiciones de tablas dinámicas) y helpers Office.js (`office.ts`).
+- Modelo de datos: Office.js no tiene API para Power Pivot, relaciones, agrupar fechas en tablas dinámicas,
+  columnas de segmentadores, conexiones de informe ni vincular formas a celdas. `macro_modelo_datos`
+  (`tools/excel/model.ts`) valida contra el libro abierto y `src/excel/macro.ts` genera un módulo VBA
+  determinista (un `PasoNN` por acción con su propio manejo de errores y un resumen final). Las llamadas al
+  modelo de objetos se validaron en Excel 365 por COM; si se cambia el VBA generado, volver a probarlo así
+  (requiere activar temporalmente "Confiar en el acceso al modelo de objetos de proyectos de VBA" y
+  restaurarlo después de que Excel cierre, porque Excel reescribe ese valor al salir). Detalles aprendidos:
+  una tabla que se llama igual que su hoja no se puede agregar al modelo (la macro renombra la hoja un
+  momento); `GetMeasure` reutiliza la medida implícita existente, así que los campos de valores se
+  referencian por posición (`pt.DataFields(k)`); las tablas del modelo creadas por VBA no traen subtotales.
 - `src/word/`: helpers puros (`spec.ts`: índices, unidades, estilos integrados, códigos de campo; `ooxml.ts`)
   y helpers Office.js (`office.ts`).
 
@@ -64,4 +75,5 @@ nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de tra
   no llega a ExcelApi 1.7 o WordApi 1.3.
 - No llamar a `getHttpsServerOptions()` de `office-addin-dev-certs` desde la config: instala certificados
   y abre un diálogo del sistema. `vite.config.ts` solo lee los archivos existentes.
-- `practicas/` (PDF y plantillas del curso) está en `.gitignore`: no publicarlo (repo público).
+- `practicas/` (PDF y plantillas del curso) está en `.gitignore`: no publicarlo (repo público). El material
+  nuevo a veces llega en otras carpetas de la raíz; `.gitignore` también excluye PDF, Excel, Word y .txt.

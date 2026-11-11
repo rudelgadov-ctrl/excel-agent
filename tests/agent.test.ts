@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { appendUserContent, prepareAssistantTurn } from "../src/agent/content";
 import { HOSTS } from "../src/agent/hosts";
 import { EXCEL_SYSTEM_PROMPT, WORD_SYSTEM_PROMPT } from "../src/agent/systemPrompt";
-import { EXCEL_TOOLSET, WORD_TOOLSET, type ToolEnv } from "../src/tools";
-import { buildUserContent, classifyFile, docxToText } from "../src/taskpane/attachments";
+import { EXCEL_TOOLSET, WORD_TOOLSET, type ToolEnv, type VbaCard } from "../src/tools";
+import { buildUserContent, classifyFile, decodeText, docxToText, xlsxToText } from "../src/taskpane/attachments";
 import { renderMarkdown } from "../src/taskpane/markdown";
 
 type Block = Anthropic.Beta.Messages.BetaContentBlock;
@@ -62,9 +62,9 @@ describe.each([
     expect(out).toEqual({ content: "Herramienta desconocida: no_existe", isError: true });
   });
 
-  it("solo las herramientas de lectura y entregar_vba funcionan sin aprobación", () => {
+  it("solo las herramientas de lectura y las que muestran VBA funcionan sin aprobación", () => {
     for (const tool of toolset.tools) {
-      const readOnly = tool.name.startsWith("leer_") || tool.name === "entregar_vba";
+      const readOnly = tool.name.startsWith("leer_") || ["entregar_vba", "macro_modelo_datos"].includes(tool.name);
       expect(toolset.isWrite(tool.name), tool.name).toBe(!readOnly);
     }
   });
@@ -86,6 +86,54 @@ describe("herramientas de Excel", () => {
     const out = await EXCEL_TOOLSET.execute("escribir_rango", { rango: "A1" }, { allowWrites: true, env });
     expect(out.isError).toBe(true);
     expect(out.content).toContain("datos");
+  });
+
+  it("macro_modelo_datos muestra la macro (solo Windows si usa el modelo) y devuelve los pasos", async () => {
+    const cards: VbaCard[] = [];
+    const out = await EXCEL_TOOLSET.execute(
+      "macro_modelo_datos",
+      {
+        nombre_macro: "ArmarModelo",
+        tablas_modelo: ["Ventas", "Vendedores"],
+        relaciones: [{ foranea: "Ventas[IdVendedor]", primaria: "Vendedores[IdVendedor]" }],
+        tablas_dinamicas: [
+          {
+            nombre: "TD_Region",
+            destino: "'Resumen'!A3",
+            filas: ["Vendedores[Region]"],
+            valores: [{ campo: "Ventas[Importe]" }],
+          },
+        ],
+        graficos: [{ tabla_dinamica: "TD_Region", rango: "'Panel'!B2:H15", leyenda: false, etiquetas_datos: true }],
+      },
+      { allowWrites: false, env: { ...env, showVba: (c) => cards.push(c) } },
+    );
+    expect(out.isError).toBe(false);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ nombre: "ArmarModelo", soloWindows: true });
+    expect(cards[0].codigo).toContain("Public Sub ArmarModelo()");
+    const result = JSON.parse(out.content);
+    expect(result.pasos).toHaveLength(5);
+    expect(result.valores_por_tabla_dinamica).toEqual({ TD_Region: ["Suma de Importe"] });
+  });
+
+  it("macro_modelo_datos explica los errores de la especificación", async () => {
+    const out = await EXCEL_TOOLSET.execute(
+      "macro_modelo_datos",
+      {
+        tablas_dinamicas: [
+          {
+            nombre: "TD",
+            destino: "'Resumen'!A3",
+            filas: ["Ventas[Fecha]"],
+            valores: [{ campo: "Ventas[Importe]" }],
+            agrupar_fechas: [{ campo: "Ventas[Fecha]", periodos: ["Trimestres"] }],
+          },
+        ],
+      },
+      { allowWrites: false, env },
+    );
+    expect(out).toMatchObject({ isError: true, content: expect.stringContaining("columnas calculadas") });
   });
 });
 
@@ -176,7 +224,37 @@ describe("adjuntos", () => {
     expect(classifyFile("practica.docx", "")).toEqual({ kind: "word" });
     expect(classifyFile("notas.txt", "")).toEqual({ kind: "text" });
     expect(classifyFile("foto.jpg", "")).toEqual({ kind: "image", mediaType: "image/jpeg" });
-    expect(classifyFile("hoja.xlsx", "application/vnd.ms-excel")).toBeNull();
+    expect(classifyFile("datos.XLSX", "")).toEqual({ kind: "excel" });
+    expect(classifyFile("datos.csv", "")).toEqual({ kind: "text" });
+    expect(classifyFile("viejo.xls", "application/vnd.ms-excel")).toBeNull();
+  });
+
+  it("lee texto en UTF-8, UTF-16 o Windows-1252 sin perder tildes", () => {
+    const text = "Región\tAño\nSan Ramón\t2024";
+    expect(decodeText(new TextEncoder().encode(text))).toBe(text);
+    expect(decodeText(new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(text)]))).toBe(text);
+    const latin1 = Uint8Array.from([...text].map((c) => c.charCodeAt(0)));
+    expect(decodeText(latin1)).toBe(text);
+    const utf16 = new Uint8Array([0xff, 0xfe, ...[...text].flatMap((c) => [c.charCodeAt(0), 0])]);
+    expect(decodeText(utf16)).toBe(text);
+  });
+
+  it("convierte un .xlsx adjunto en texto con fechas ISO", () => {
+    const sheet =
+      '<worksheet><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="C1" t="s"><v>1</v></c></row>' +
+      '<row r="2"><c r="A2" t="inlineStr"><is><t>Ana &amp; Luis</t></is></c><c r="B2"><v>12.5</v></c>' +
+      '<c r="C2" s="1"><v>45366</v></c></row></sheetData></worksheet>';
+    const xlsx = zipSync({
+      "xl/workbook.xml": strToU8('<workbook><sheets><sheet name="Datos" sheetId="1" r:id="rId1"/></sheets></workbook>'),
+      "xl/_rels/workbook.xml.rels": strToU8('<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>'),
+      "xl/sharedStrings.xml": strToU8("<sst><si><t>Nombre</t></si><si><r><t>Fe</t></r><r><t>cha</t></r></si></sst>"),
+      "xl/styles.xml": strToU8('<styleSheet><cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14"/></cellXfs></styleSheet>'),
+      "xl/worksheets/sheet1.xml": strToU8(sheet),
+    });
+    const text = xlsxToText(xlsx);
+    expect(text).toContain("### Hoja «Datos»");
+    expect(text).toContain("1\tNombre\t\tFecha");
+    expect(text).toContain("2\tAna & Luis\t12.5\t2024-03-15");
   });
 
   it("nombra las imágenes adjuntas y usa la solicitud por defecto de la aplicación", () => {
@@ -214,7 +292,8 @@ describe("adjuntos", () => {
 describe("generalidad", () => {
   // El agente debe servir para cualquier práctica: nada en el prompt ni en las
   // herramientas puede depender de las prácticas usadas como referencia.
-  const specific = /Amortizaci|Inventario|Facturar|Librer[ií]a|Prec\. por|San Isidro|DN0102|Quiz/i;
+  const specific =
+    /Amortizaci|Inventario|Facturar|Librer[ií]a|Prec\. por|San Isidro|DN0102|Quiz|Cr[eé]ditos?\b|Clientes|Provincia|Cant[oó]n|AnalisisDinamico|IdCredito|Britannic|XZY|Clasificaciones|Tri1/i;
 
   it.each(Object.values(HOSTS))("el prompt de $app no menciona prácticas concretas", ({ systemPrompt, app }) => {
     expect(systemPrompt).not.toMatch(specific);
@@ -278,6 +357,11 @@ describe("generalidad", () => {
       "quitar_duplicados",
       "configurar_hoja",
       "entregar_vba",
+      "limpiar_datos",
+      "modificar_tabla",
+      "segmentacion",
+      "gestionar_formas",
+      "macro_modelo_datos",
     ]) {
       expect(names).toContain(name);
     }

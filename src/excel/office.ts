@@ -43,7 +43,7 @@ export function supports(minor: number): boolean {
 
 /** Convierte errores de Office.js en un mensaje útil para el agente. */
 export async function describeOfficeError(err: unknown): Promise<string> {
-  if (err instanceof OfficeExtension.Error) {
+  if (typeof OfficeExtension !== "undefined" && err instanceof OfficeExtension.Error) {
     let msg = `${err.code}: ${err.message}`;
     const loc = err.debugInfo?.errorLocation;
     if (loc) msg += ` (en ${loc})`;

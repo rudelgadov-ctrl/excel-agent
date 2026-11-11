@@ -6,6 +6,15 @@ Thumbs.db
 
 # Material de las prácticas (UCR): solo para pruebas locales, no se publica.
 practicas/
+Dashboards en Excel-*/
+Excel (Tablas y*/
+# Por si se copia material del curso en otra carpeta: el repo no versiona documentos ni datos.
+*.pdf
+*.xlsx
+*.xlsm
+*.xls
+*.docx
+*.txt
 
 # Archivos temporales de Excel
 ~$*
