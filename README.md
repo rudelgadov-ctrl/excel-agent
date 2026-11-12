@@ -29,36 +29,37 @@ Funciona en **Windows** y **Mac** (y en Excel y Word en la web).
 
 ## Instalación (una vez por computadora)
 
-### Windows
+No hace falta descargar ni clonar nada: un solo comando en la terminal. El script baja el manifiesto
+de GitHub Pages y lo registra en Excel y en Word.
+
+### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/rudelgadov-ctrl/excel-agent.git
-cd excel-agent
-powershell -ExecutionPolicy Bypass -File scripts\instalar-windows.ps1
+irm https://raw.githubusercontent.com/rudelgadov-ctrl/excel-agent/main/scripts/instalar-windows.ps1 | iex
 ```
 
 Cierra Excel y Word por completo y vuelve a abrirlos: aparece el botón **Agente Excel** (o **Agente Word**)
-en la pestaña Inicio.
+en la pestaña Inicio. El manifiesto queda en `%LOCALAPPDATA%\AgenteOffice`.
 
-### Mac
+### Mac (Terminal)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rudelgadov-ctrl/excel-agent/main/scripts/instalar-mac.sh | bash
+```
+
+Abre Excel y Word una vez antes (para que macOS cree sus carpetas), luego ciérralos (Cmd+Q), ábrelos y ve a
+**Insertar > Complementos > Mis complementos > Agente Office**.
+
+### Desde un clon del repo (desarrollo)
 
 ```bash
 git clone https://github.com/rudelgadov-ctrl/excel-agent.git
 cd excel-agent
-./scripts/instalar-mac.sh
+./scripts/instalar-mac.sh                                                   # Mac
+powershell -ExecutionPolicy Bypass -File scripts\instalar-windows.ps1       # Windows
 ```
 
-El script instala el complemento en Excel y en Word. Sin clonar el repo también sirve:
-
-```bash
-for APP in Excel Word; do
-  mkdir -p ~/Library/Containers/com.microsoft.$APP/Data/Documents/wef
-  curl -o ~/Library/Containers/com.microsoft.$APP/Data/Documents/wef/excel-agent.xml \
-    https://rudelgadov-ctrl.github.io/excel-agent/manifest.xml
-done
-```
-
-Cierra Excel y Word (Cmd+Q), ábrelos y ve a **Insertar > Complementos > Mis complementos > Agente Office**.
+Desde un clon, los scripts usan el `manifest.xml` del repo en lugar de descargarlo.
 
 ### Primera vez en el panel
 
@@ -186,7 +187,15 @@ Y registra el manifiesto de desarrollo, que aparece como **Agente (dev)** en Exc
 - Windows: `powershell -ExecutionPolicy Bypass -File scripts\instalar-windows.ps1 -Dev`
 - Mac: `./scripts/instalar-mac.sh --dev`
 
-Para desinstalar, los mismos scripts aceptan `-Desinstalar` / `--desinstalar`.
+Para desinstalar, los mismos scripts aceptan `-Desinstalar` / `--desinstalar`. Sin clon:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/rudelgadov-ctrl/excel-agent/main/scripts/instalar-windows.ps1))) -Desinstalar
+```
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/rudelgadov-ctrl/excel-agent/main/scripts/instalar-mac.sh | bash -s -- --desinstalar
+```
 
 ### Estructura
 

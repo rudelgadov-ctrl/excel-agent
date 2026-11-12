@@ -75,5 +75,8 @@ nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de tra
   no llega a ExcelApi 1.7 o WordApi 1.3.
 - No llamar a `getHttpsServerOptions()` de `office-addin-dev-certs` desde la config: instala certificados
   y abre un diálogo del sistema. `vite.config.ts` solo lee los archivos existentes.
+- `scripts/instalar-windows.ps1` debe seguir siendo ASCII puro y sin BOM: se ejecuta con `irm ... | iex` y un BOM
+  (o un acento mal leído) rompe el comando en Windows PowerShell 5.1. Ambos scripts descargan el manifiesto de
+  GitHub Pages si no se ejecutan desde un clon; la instalación publicada es un comando de una línea (ver README).
 - `practicas/` (PDF y plantillas del curso) está en `.gitignore`: no publicarlo (repo público). El material
   nuevo a veces llega en otras carpetas de la raíz; `.gitignore` también excluye PDF, Excel, Word y .txt.
