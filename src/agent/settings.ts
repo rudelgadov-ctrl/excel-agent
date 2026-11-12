@@ -8,8 +8,6 @@ export interface Settings {
   workspaceId: string;
   model: string;
   effort: Effort;
-  /** Ejecuta sin pedir aprobación del plan. */
-  autoMode: boolean;
 }
 
 export interface ModelInfo {
@@ -43,7 +41,6 @@ export const DEFAULT_SETTINGS: Settings = {
   workspaceId: "",
   model: "claude-opus-5-5",
   effort: "high",
-  autoMode: false,
 };
 
 const STORAGE_KEY = "excel-agent.settings.v1";
@@ -54,6 +51,8 @@ export function loadSettings(): Settings {
     if (!raw) return { ...DEFAULT_SETTINGS };
     const saved = JSON.parse(raw) as Partial<Settings>;
     const merged = { ...DEFAULT_SETTINGS, ...saved };
+    // Ajuste retirado (el agente siempre es automático): se descarta lo que haya guardado una versión anterior.
+    delete (merged as { autoMode?: unknown }).autoMode;
     if (!MODELS.some((m) => m.id === merged.model)) merged.model = DEFAULT_SETTINGS.model;
     if (!EFFORTS.some((e) => e.id === merged.effort)) merged.effort = DEFAULT_SETTINGS.effort;
     return merged;

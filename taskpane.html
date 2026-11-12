@@ -15,7 +15,7 @@
         </div>
         <div class="topbar-actions">
           <button id="btn-new" class="ghost" type="button" title="Empezar una conversación nueva">Nueva</button>
-          <button id="btn-settings" class="ghost" type="button" title="API key, modelo y modo">Ajustes</button>
+          <button id="btn-settings" class="ghost" type="button" title="API key, modelo y esfuerzo">Ajustes</button>
         </div>
       </header>
 
@@ -23,6 +23,7 @@
         Este panel funciona dentro de Excel o Word. Ábrelo desde la pestaña Inicio &gt; Agente.
       </div>
 
+      <div class="stage">
       <section id="settings" class="settings" hidden>
         <h2>Ajustes</h2>
         <label class="field">
@@ -50,10 +51,6 @@
           <span>Esfuerzo</span>
           <select id="set-effort"></select>
         </label>
-        <label class="check">
-          <input id="set-auto" type="checkbox" />
-          <span>Modo automático: ejecutar sin pedir aprobación del plan</span>
-        </label>
         <div class="row end">
           <span id="settings-msg" class="muted"></span>
           <button id="btn-save-settings" class="primary" type="button">Guardar</button>
@@ -67,25 +64,25 @@
           <ol>
             <li id="empty-open">Abre la plantilla en Excel o en Word.</li>
             <li>Pega las instrucciones o adjunta el archivo (PDF, Word, Excel, texto o imagen; también los archivos de datos que haya que importar). Si ya vienen dentro del archivo, solo pídele que las resuelva.</li>
-            <li>Revisa el plan y presiona <strong>Aprobar y ejecutar</strong>.</li>
+            <li>El agente lo hace todo solo, sin pedir aprobación, y al terminar muestra qué quedó hecho y qué falta.</li>
           </ol>
           <p class="muted">
             Trabaja sobre una copia de la plantilla: algunos cambios del agente no se pueden deshacer con Ctrl+Z.
           </p>
         </div>
       </main>
+      </div>
 
       <div id="action-bar" class="action-bar" hidden>
-        <button id="btn-approve" class="primary" type="button">Aprobar y ejecutar</button>
-        <button id="btn-continue" class="primary" type="button" hidden>Continuar</button>
-        <span class="muted" id="action-hint">o escribe abajo los cambios al plan</span>
+        <button id="btn-continue" class="primary" type="button">Continuar</button>
+        <span class="muted">El agente llegó a su límite de pasos y puede seguir donde se quedó.</span>
       </div>
 
       <footer class="composer" id="composer">
         <div id="attachments" class="attachments"></div>
         <textarea
           id="input"
-          rows="4"
+          rows="3"
           placeholder="Pega aquí las instrucciones (Ctrl+Enter para enviar)…"
         ></textarea>
         <div class="row">

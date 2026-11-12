@@ -299,7 +299,11 @@ describe("generalidad", () => {
     expect(systemPrompt).not.toMatch(specific);
     expect(systemPrompt).toMatch(/CUALQUIER práctica/);
     expect(systemPrompt).toContain(`Agente ${app}`);
-    expect(systemPrompt).toContain("[Estado: esperando aprobación]");
+  });
+
+  it.each(Object.values(HOSTS))("el prompt de $app no pide aprobación del plan", ({ systemPrompt }) => {
+    expect(systemPrompt).toContain("No hay paso de aprobación");
+    expect(systemPrompt).not.toMatch(/esperando aprobación|BLOQUEADO|plan aprobado/i);
   });
 
   it.each(Object.values(HOSTS))("las herramientas de $app no mencionan prácticas concretas", ({ toolset }) => {

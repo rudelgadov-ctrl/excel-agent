@@ -28,7 +28,7 @@ export interface AgentTool<S extends z.ZodType = z.ZodType> {
   name: string;
   description: string;
   schema: S;
-  /** Modifica el archivo: requiere que el usuario haya aprobado el plan. */
+  /** Modifica el archivo. `Toolset.execute` solo la deja correr con `allowWrites` (el panel siempre lo activa). */
   writes: boolean;
   run(input: z.infer<S>, env: ToolEnv): Promise<unknown>;
 }

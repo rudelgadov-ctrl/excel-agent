@@ -3,7 +3,6 @@ import type { ToolEnv } from "../tools";
 import { appendUserContent, prepareAssistantTurn } from "./content";
 import type { HostProfile } from "./hosts";
 import { modelInfo, type ModelInfo, type Settings } from "./settings";
-import { STATUS } from "./systemPrompt";
 
 type MessageParam = Anthropic.Beta.Messages.BetaMessageParam;
 type ContentBlockParam = Anthropic.Beta.Messages.BetaContentBlockParam;
@@ -35,9 +34,6 @@ export interface AgentEvents {
 
 export type TurnEnd = "done" | "refusal" | "aborted" | "error" | "limit";
 
-/** reset: mensaje nuevo del usuario (pide plan); grant: aprobó el plan; keep: continuar igual. */
-export type Approval = "reset" | "grant" | "keep";
-
 const emptyUsage = (): UsageTotals => ({
   inputTokens: 0,
   outputTokens: 0,
@@ -49,7 +45,6 @@ const emptyUsage = (): UsageTotals => ({
 export class OfficeAgent {
   private messages: MessageParam[] = [];
   private controller: AbortController | null = null;
-  approved = false;
   usage: UsageTotals = emptyUsage();
 
   constructor(
@@ -69,22 +64,13 @@ export class OfficeAgent {
   reset(): void {
     if (this.busy) throw new Error("Detén el agente antes de reiniciar la conversación.");
     this.messages = [];
-    this.approved = false;
     this.usage = emptyUsage();
   }
 
-  async send(
-    content: ContentBlockParam[],
-    settings: Settings,
-    events: AgentEvents,
-    approval: Approval = "reset",
-  ): Promise<TurnEnd> {
+  /** El agente siempre ejecuta de principio a fin: no hay paso de aprobación del plan. */
+  async send(content: ContentBlockParam[], settings: Settings, events: AgentEvents): Promise<TurnEnd> {
     if (this.busy) throw new Error("El agente está ocupado.");
-    if (approval === "grant") this.approved = true;
-    if (approval === "reset") this.approved = false;
-    const allowWrites = settings.autoMode || this.approved;
-    const status = settings.autoMode ? STATUS.auto : this.approved ? STATUS.approved : STATUS.awaitingApproval;
-    appendUserContent(this.messages, [...content, { type: "text", text: status }]);
+    appendUserContent(this.messages, content);
 
     const controller = new AbortController();
     this.controller = controller;
@@ -159,7 +145,7 @@ export class OfficeAgent {
             continue;
           }
           events.onToolStart(toolUse.id, toolUse.name, toolUse.input);
-          const out = await this.host.toolset.execute(toolUse.name, toolUse.input, { allowWrites, env: this.env });
+          const out = await this.host.toolset.execute(toolUse.name, toolUse.input, { allowWrites: true, env: this.env });
           events.onToolEnd(toolUse.id, !out.isError, out.content);
           results.push({
             type: "tool_result",

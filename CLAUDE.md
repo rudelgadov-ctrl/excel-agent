@@ -34,10 +34,14 @@ nadie ha visto. Las prácticas de `practicas/` son solo ejemplos del tipo de tra
 - `src/agent/loop.ts`: bucle manual con `client.beta.messages.stream` + `finalMessage()`,
   `dangerouslyAllowBrowser`, pensamiento adaptativo con `display: "updates"`, `fallbacks: "default"`,
   caché automática. El historial es solo de agregado: no editar mensajes anteriores (pensamiento preservado).
-- Aprobación del plan: las herramientas con `writes: true` devuelven `BLOQUEADO` hasta que el usuario
-  aprueba (o modo automático). El estado viaja como nota al final de cada mensaje de usuario
-  (`STATUS` en `systemPrompt.ts`), no en el prompt de sistema, para no romper la caché.
-- `systemPrompt.ts`: `EXCEL_SYSTEM_PROMPT` y `WORD_SYSTEM_PROMPT` comparten los pasos de aprobación,
+- Sin aprobación del plan: el agente siempre es automático (decisión del usuario); no hay ajuste ni botón
+  «Aprobar». El bucle pasa `allowWrites: true` a `Toolset.execute`, que conserva el bloqueo `BLOQUEADO` para
+  las herramientas `writes: true` por si algún día se reactiva. El prompt (`planStep`) pide anunciar en pocas
+  líneas lo que se hará y seguir de inmediato, registrando las ambigüedades como supuestos.
+- `src/taskpane/styles.css`: `[hidden]` lleva `display: none !important` porque los componentes con
+  `display: flex` anulaban el atributo (Ajustes y la barra de acción no se ocultaban). Ajustes se superpone
+  al área de la conversación (`.stage`) en vez de apilarse, para que la respuesta conserve todo el alto.
+- `systemPrompt.ts`: `EXCEL_SYSTEM_PROMPT` y `WORD_SYSTEM_PROMPT` comparten los pasos de ejecución,
   cierre y estilo. Cada prompt debe nombrar todas sus herramientas y ninguna de la otra aplicación (lo prueba
   `tests/agent.test.ts`).
 - Adjuntos (`src/taskpane/attachments.ts`): PDF e imágenes van en base64; Word (.docx, con fflate), Excel

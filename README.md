@@ -2,8 +2,8 @@
 
 Complemento de **Excel y Word** con un agente (Claude) que resuelve **cualquier práctica, tarea o
 requerimiento** sobre el libro o el documento abierto, incluidas prácticas nuevas que nunca ha visto.
-Abres la plantilla, pegas las instrucciones o adjuntas el archivo, revisas el plan que propone y presionas
-**Aprobar y ejecutar**. Es el mismo complemento en las dos aplicaciones: el panel detecta si se abrió en
+Abres la plantilla, pegas las instrucciones o adjuntas el archivo y el agente lo ejecuta de principio a fin,
+sin pedir aprobación. Es el mismo complemento en las dos aplicaciones: el panel detecta si se abrió en
 Excel o en Word y usa las herramientas de esa aplicación.
 Funciona en **Windows** y **Mac** (y en Excel y Word en la web).
 
@@ -75,15 +75,16 @@ ni a GitHub), así que hay que ponerla en cada máquina.
    texto, así que si la práctica tiene figuras, exporta a PDF. Si las instrucciones ya están dentro del
    archivo (una hoja, un cuadro de texto o el propio documento), basta con escribir "resuelve las
    instrucciones del archivo".
-3. El agente arma la lista de requerimientos, inspecciona el archivo y propone un **plan** con la misma
-   numeración de la práctica. Si quieres cambios, escríbelos; si está bien, presiona **Aprobar y ejecutar**.
+3. El agente arma la lista de requerimientos, inspecciona el archivo, anuncia en pocas líneas qué va a hacer
+   (con la misma numeración de la práctica) y lo ejecuta de inmediato: **no hay paso de aprobación**.
+   Puedes detenerlo con **Detener** o pedirle cambios después.
 4. Al terminar muestra una tabla con **todos** los puntos: hecho, hecho con alternativa o pasos manuales.
 
 En Word, las imágenes que adjuntes en la conversación también se pueden insertar en el documento
 ("inserta el logo adjunto en el encabezado").
 
-En **Ajustes** puedes activar el **modo automático** (ejecuta sin pedir aprobación), cambiar el modelo
-(Opus 5.5 recomendado; Sonnet 5.5 cuesta la mitad) y el nivel de esfuerzo.
+En **Ajustes** puedes cambiar el modelo (Opus 5.5 recomendado; Sonnet 5.5 cuesta la mitad) y el nivel de
+esfuerzo.
 
 ## Qué sabe hacer
 
@@ -164,7 +165,7 @@ los PDF adjuntos y cuántas correcciones haga. Con Sonnet 5.5 cuesta aproximadam
   Ese almacenamiento se comparte con otras páginas que publiques en `rudelgadov-ctrl.github.io`.
 - El contenido del libro o documento que el agente lee y los archivos que adjuntas se envían a la API de Anthropic.
 - `ejecutar_office_js` ejecuta código generado por el agente dentro del archivo abierto. Solo puede
-  actuar sobre ese archivo, pero revisa el plan antes de aprobarlo.
+  actuar sobre ese archivo. Como el agente ejecuta sin pedir aprobación, trabaja siempre sobre una copia.
 
 ## Desarrollo
 
@@ -201,7 +202,7 @@ curl -fsSL https://raw.githubusercontent.com/rudelgadov-ctrl/excel-agent/main/sc
 
 ```
 manifest.xml / manifest.dev.xml   Manifiestos del complemento para Excel y Word (producción / desarrollo)
-taskpane.html, src/taskpane/      Panel: chat, adjuntos, plan, tarjetas VBA, ajustes
+taskpane.html, src/taskpane/      Panel: chat, adjuntos, tarjetas VBA, ajustes
 src/agent/                        Bucle con la API de Claude, prompts de sistema, perfil por aplicación
 src/tools/excel/, src/tools/word/ Herramientas Office.js de cada aplicación
 src/excel/, src/word/             Helpers (direcciones, series, estilos, OOXML, Office.js)

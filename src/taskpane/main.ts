@@ -1,7 +1,7 @@
 import "./styles.css";
 import type Anthropic from "@anthropic-ai/sdk";
 import { HOSTS, type HostKind, type HostProfile } from "../agent/hosts";
-import { OfficeAgent, type AgentEvents, type Approval, type TurnEnd } from "../agent/loop";
+import { OfficeAgent, type AgentEvents, type TurnEnd } from "../agent/loop";
 import { EFFORTS, MODELS, loadSettings, modelInfo, saveSettings, type Effort, type Settings } from "../agent/settings";
 import { excelApiMinor } from "../excel/office";
 import { truncate } from "../excel/text";
@@ -35,12 +35,9 @@ const ui = {
   setWorkspace: $<HTMLInputElement>("set-workspace"),
   setModel: $<HTMLSelectElement>("set-model"),
   setEffort: $<HTMLSelectElement>("set-effort"),
-  setAuto: $<HTMLInputElement>("set-auto"),
   settingsMsg: $("settings-msg"),
   actionBar: $("action-bar"),
-  btnApprove: $<HTMLButtonElement>("btn-approve"),
   btnContinue: $<HTMLButtonElement>("btn-continue"),
-  actionHint: $("action-hint"),
   composer: $("composer"),
   attachments: $("attachments"),
   input: $<HTMLTextAreaElement>("input"),
@@ -372,7 +369,6 @@ function vbaCard(card: VbaCard, host: HostKind): HTMLElement {
 function setBusy(busy: boolean): void {
   ui.btnSend.disabled = busy || !inHost;
   ui.btnStop.hidden = !busy;
-  ui.btnApprove.disabled = busy;
   ui.btnContinue.disabled = busy;
 }
 
@@ -384,17 +380,12 @@ function updateMeta(): void {
   const model = modelInfo(settings.model).label.replace(/\s*\(.*\)$/, "");
   const api = !inHost ? "" : agent.host.kind === "word" ? ` · WordApi 1.${wordApiMinor()}` : ` · ExcelApi 1.${excelApiMinor()}`;
   const cost = agent.usage.costUsd > 0 ? ` · ≈ US$${agent.usage.costUsd.toFixed(2)} en esta conversación` : "";
-  const mode = settings.autoMode ? " · modo automático" : "";
-  ui.meta.textContent = `${model}${api}${mode}${cost}`;
+  ui.meta.textContent = `${model}${api}${cost}`;
 }
 
+/** Solo aparece "Continuar" cuando el agente se detuvo por el límite de pasos. */
 function showActionBar(end: TurnEnd | null): void {
-  const planPending = end === "done" && !settings.autoMode && !agent.approved;
-  const canContinue = end === "limit";
-  ui.btnApprove.hidden = !planPending;
-  ui.actionHint.hidden = !planPending;
-  ui.btnContinue.hidden = !canContinue;
-  ui.actionBar.hidden = !(planPending || canContinue);
+  ui.actionBar.hidden = end !== "limit";
 }
 
 function renderUserMessage(text: string, files: Attachment[] = []): void {
@@ -451,12 +442,7 @@ async function addFiles(files: Iterable<File>): Promise<void> {
 
 // ---------- flujo de conversación ----------
 
-async function runTurn(
-  content: ContentBlockParam[],
-  approval: Approval,
-  label: string,
-  files: Attachment[] = [],
-): Promise<void> {
+async function runTurn(content: ContentBlockParam[], label: string, files: Attachment[] = []): Promise<void> {
   renderUserMessage(label, files);
   showActionBar(null);
   const turn = new TurnView();
@@ -484,7 +470,7 @@ async function runTurn(
 
   let end: TurnEnd;
   try {
-    end = await agent.send(content, settings, events, approval);
+    end = await agent.send(content, settings, events);
   } catch (err) {
     turn.notice(err instanceof Error ? err.message : String(err), "error");
     end = "error";
@@ -524,17 +510,12 @@ async function onSend(): Promise<void> {
   ui.input.value = "";
   attachments = [];
   renderAttachments();
-  await runTurn(content, "reset", text || "(instrucciones en el adjunto)", files);
-}
-
-async function onApprove(): Promise<void> {
-  if (agent.busy || !requireApiKey()) return;
-  await runTurn([{ type: "text", text: "Plan aprobado. Ejecútalo completo." }], "grant", "✅ Plan aprobado");
+  await runTurn(content, text || "(instrucciones en el adjunto)", files);
 }
 
 async function onContinue(): Promise<void> {
   if (agent.busy || !requireApiKey()) return;
-  await runTurn([{ type: "text", text: "Continúa donde te quedaste." }], "keep", "Continuar");
+  await runTurn([{ type: "text", text: "Continúa donde te quedaste." }], "Continuar");
 }
 
 function onNewConversation(): void {
@@ -564,7 +545,6 @@ function openSettings(open = ui.settings.hidden): void {
     ui.setWorkspace.value = settings.workspaceId;
     ui.setModel.value = settings.model;
     ui.setEffort.value = settings.effort;
-    ui.setAuto.checked = settings.autoMode;
     ui.settingsMsg.textContent = "";
   }
 }
@@ -575,7 +555,6 @@ function onSaveSettings(): void {
     workspaceId: ui.setWorkspace.value.trim(),
     model: ui.setModel.value,
     effort: ui.setEffort.value as Effort,
-    autoMode: ui.setAuto.checked,
   };
   const stored = saveSettings(settings);
   ui.settingsMsg.textContent = stored ? "Guardado." : "No se pudo guardar en este equipo; se usará solo en esta sesión.";
@@ -593,7 +572,6 @@ function initSettingsForm(): void {
 function wireEvents(): void {
   ui.btnSend.addEventListener("click", () => void onSend());
   ui.btnStop.addEventListener("click", () => agent.stop());
-  ui.btnApprove.addEventListener("click", () => void onApprove());
   ui.btnContinue.addEventListener("click", () => void onContinue());
   $("btn-new").addEventListener("click", onNewConversation);
   $("btn-settings").addEventListener("click", () => openSettings());
